@@ -1,0 +1,8 @@
+[package]
+
+name = "aoc2015_4"
+version = "0.0.1"
+authors = ["Scott Janke"]
+
+[dependencies]
+md5 = "0.3"
