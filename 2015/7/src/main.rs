@@ -83,6 +83,18 @@ enum Gate {
 	Not(Prefix)
 }
 
+impl Gate {
+	fn wires(&self) -> (Operand, Option<Operand>, WireRef) {
+		match self {
+			&Gate::And(Infix{op_left, op_right, result_ref})    |
+			&Gate::Or(Infix{op_left, op_right, result_ref})     |
+			&Gate::LShift(Infix{op_left, op_right, result_ref}) |
+			&Gate::RShift(Infix{op_left, op_right, result_ref}) => (op_left, Some(op_right), result_ref),
+			&Gate::Not(Prefix{op, result_ref}) => (op, None, result_ref)
+		}
+	}
+}
+
 struct Gates(Vec<Gate>);
 
 impl Gates {
@@ -161,18 +173,6 @@ impl Gates {
 			if let Some(update_ref) = self.update_result(*gate_ref, wire_values) {
 				self.update_dependent_gates(update_ref, wire_gates, wire_values);
 			}
-		}
-	}
-}
-
-impl Gate {
-	fn wires(&self) -> (Operand, Option<Operand>, WireRef) {
-		match self {
-			&Gate::And(Infix{op_left, op_right, result_ref})    |
-			&Gate::Or(Infix{op_left, op_right, result_ref})     |
-			&Gate::LShift(Infix{op_left, op_right, result_ref}) |
-			&Gate::RShift(Infix{op_left, op_right, result_ref}) => (op_left, Some(op_right), result_ref),
-			&Gate::Not(Prefix{op, result_ref}) => (op, None, result_ref)
 		}
 	}
 }
