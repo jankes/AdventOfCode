@@ -6,8 +6,17 @@ use std::str;
 use std::str::FromStr;
 
 fn main() {
-	//let input = read_input("C:\\Users\\jankes\\Documents\\AdventOfCode\\2015\\7\\input_test1.txt");
-	//let wire_values = simulate(&input);
+	let input = read_input("C:\\Users\\sjank\\Documents\\Projects\\AdventOfCode\\2015\\7\\input.txt");
+	let wire_values = simulate(&input);
+
+	let mut entries = wire_values.iter()
+								 .map(|(k, v)| (std::convert::Into::<&str>::into(k), v))
+					   			 .collect::<Vec<_>>();
+	
+	entries.sort_unstable();
+	for &(k, v) in entries.iter() {
+		println!("{} -> {}", k, v.map_or(String::from(""), |v| v.to_string()));
+	} 
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -15,18 +24,7 @@ struct WireRef([u8; 2]);
 
 impl<'a> From<&'a WireRef> for &'a str {
 	fn from(w: &'a WireRef) -> &'a str {
-		if w.0[0] == 0 {
-			str::from_utf8(&w.0[1..]).expect("wire name should be valid utf8 string")
-		} else {
-			str::from_utf8(&w.0).expect("wire name should be valid utf8 string")
-		}
-	}
-}
-
-impl<'a> From<&'a WireRef> for String {
-	fn from(w: &'a WireRef) -> String {
-		let s: &str = w.into();
-		String::from(w)
+		str::from_utf8(&w.0).expect("wire name should be valid utf8 string")
 	}
 }
 
@@ -105,54 +103,60 @@ impl Gates {
 		let gate = self.get(gate_ref);
 		match gate {
 			&Gate::And(Infix {op_left, op_right, result_ref}) => {
-				if let (Some(left_val), Some(right_val)) = (op_left.value(wire_values), op_right.value(wire_values)) {
-					let value = wire_values.get_mut(&result_ref).unwrap();
-					*value = Some(left_val & right_val);
-					Some(result_ref)
-				} else {
-					None
+				match (op_left.value(wire_values), op_right.value(wire_values), wire_values[&result_ref]) {
+					(Some(left_val), Some(right_val), None) => {
+						let result = wire_values.get_mut(&result_ref).unwrap();
+						*result = Some(left_val & right_val);
+						Some(result_ref)
+					}
+					_ => None
 				}
 			},
 			&Gate::Or(Infix {op_left, op_right, result_ref}) => {
-				if let (Some(left_val), Some(right_val)) = (op_left.value(wire_values), op_right.value(wire_values)) {
-					let value = wire_values.get_mut(&result_ref).unwrap();
-					*value = Some(left_val | right_val);
-					Some(result_ref)
-				} else {
-					None
+				match (op_left.value(wire_values), op_right.value(wire_values), wire_values[&result_ref]) {
+					(Some(left_val), Some(right_val), None) => {
+						let result = wire_values.get_mut(&result_ref).unwrap();
+						*result = Some(left_val | right_val);
+						Some(result_ref)
+					}
+					_ => None
 				}
 			},
 			&Gate::LShift(Infix {op_left, op_right, result_ref}) => {
-				if let (Some(left_val), Some(right_val)) = (op_left.value(wire_values), op_right.value(wire_values)) {
-					let value = wire_values.get_mut(&result_ref).unwrap();
-					*value = Some(left_val << right_val);
-					Some(result_ref)
-				} else {
-					None
+				match (op_left.value(wire_values), op_right.value(wire_values), wire_values[&result_ref]) {
+					(Some(left_val), Some(right_val), None) => {
+						let result = wire_values.get_mut(&result_ref).unwrap();
+						*result = Some(left_val << right_val);
+						Some(result_ref)
+					}
+					_ => None
 				}
 			},
 			&Gate::RShift(Infix {op_left, op_right, result_ref}) => {
-				if let (Some(left_val), Some(right_val)) = (op_left.value(wire_values), op_right.value(wire_values)) {
-					let value = wire_values.get_mut(&result_ref).unwrap();
-					*value = Some(left_val >> right_val);
-					Some(result_ref)
-				} else {
-					None
+				match (op_left.value(wire_values), op_right.value(wire_values), wire_values[&result_ref]) {
+					(Some(left_val), Some(right_val), None) => {
+						let result = wire_values.get_mut(&result_ref).unwrap();
+						*result = Some(left_val >> right_val);
+						Some(result_ref)
+					}
+					_ => None
 				}
 			}
 			&Gate::Not(Prefix {op, result_ref}) => {
-				if let Some(val) = op.value(wire_values) {
-					let value = wire_values.get_mut(&result_ref).unwrap();
-					*value = Some(!val);
-					Some(result_ref)
-				} else {
-					None
+				match (op.value(wire_values), wire_values[&result_ref]) {
+					(Some(val), None) => {
+						let result = wire_values.get_mut(&result_ref).unwrap();
+						*result = Some(!val);
+						Some(result_ref)
+					}
+					_ => None
 				}
 			}
 		}
 	}
 	
 	fn update_dependent_gates(&self, wire_ref: WireRef, wire_gates: &HashMap<WireRef, Vec<GateRef>>, wire_values: &mut HashMap<WireRef, Option<u16>>) {
+		//println!("{}", std::convert::Into::<&str>::into(&wire_ref));
 		for gate_ref in wire_gates[&wire_ref].iter() {
 			if let Some(update_ref) = self.update_result(*gate_ref, wire_values) {
 				self.update_dependent_gates(update_ref, wire_gates, wire_values);
@@ -194,6 +198,7 @@ fn simulate(input: &str) -> HashMap<WireRef, Option<u16>> {
 				gate_refs.push(gate_ref);
 			}
 			wire_values.entry(result_ref).or_insert(None);
+			wire_gates.entry(result_ref).or_insert(Vec::new());
 			
 			if let Some(update_ref) = gates.update_result(gate_ref, &mut wire_values) {
 				gates.update_dependent_gates(update_ref, &wire_gates, &mut wire_values);
@@ -275,12 +280,34 @@ fn parse_operand(s: &str) -> Operand {
 fn parse_wire_ref(s: &str) -> WireRef {
 	let bytes = s.as_bytes();
 	if bytes.len() == 1 {
-		WireRef([0u8, bytes[0]])
+		WireRef([bytes[0], b' '])
 	} else {
 		WireRef([bytes[0], bytes[1]])
 	}
 }
 
+/*
+impl<'a> From<&'a WireRef> for String {
+	fn from(w: &'a WireRef) -> String {
+		let s: &str = w.into();
+		String::from(w)
+	}
+}
+*/
+
+/*
+if let (Some(left_val), Some(right_val)) = (op_left.value(wire_values), op_right.value(wire_values)) {
+	let value = wire_values.get_mut(&result_ref).unwrap();
+	if value.is_none() {
+		*value = Some(left_val & right_val);
+		Some(result_ref)
+	} else {
+		None
+	}
+} else {
+	None
+}
+*/
 
 /*
 impl Infix {
