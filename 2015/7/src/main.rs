@@ -6,17 +6,23 @@ use std::str;
 use std::str::FromStr;
 
 fn main() {
-	let input = read_input("C:\\Users\\sjank\\Documents\\Projects\\AdventOfCode\\2015\\7\\input.txt");
-	let wire_values = simulate(&input);
+	let input = read_input("C:\\Users\\sjank\\Documents\\Projects\\AdventOfCode\\2015\\7\\input2.txt");
+	let mut sim = Simulation::new();
+	sim.run(&input);
+	
+	println!("Part 1:");
+	print_values(&sim.wire_values);
+}
 
+fn print_values(wire_values: &HashMap<WireRef, Option<u16>>) {
 	let mut entries = wire_values.iter()
-								 .map(|(k, v)| (std::convert::Into::<&str>::into(k), v))
-					   			 .collect::<Vec<_>>();
+								.map(|(k, v)| (std::convert::Into::<&str>::into(k), v))
+								.collect::<Vec<_>>();
 	
 	entries.sort_unstable();
 	for &(k, v) in entries.iter() {
 		println!("{} -> {}", k, v.map_or(String::from(""), |v| v.to_string()));
-	} 
+	}
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -110,9 +116,61 @@ impl Gates {
 	fn get(&self, gref: GateRef) -> &Gate {
 		&self.0[gref.0]
 	}
+}
+
+struct Simulation {
+	gates: Gates,
+	wire_values: HashMap<WireRef, Option<u16>>,
+	wire_gates: HashMap<WireRef, Vec<GateRef>>
+}
+
+impl Simulation {
+	fn new() -> Simulation {
+		Simulation {
+			wire_values: HashMap::new(),
+			wire_gates: HashMap::new(),
+			gates: Gates::new()
+		}
+	}
+
+	fn run(&mut self, input: &str) {
+		let gates = &mut self.gates;
+		let mut wire_values = &mut self.wire_values;
+		let wire_gates = &mut self.wire_gates;
+		for s in input.split("\r\n") {
+			let gate = parse_gate(s);
+			let (left, right, result_ref) = gate.wires();
+			let gate_ref = gates.add(gate);
+			
+			if let Operand::WireRef(wr) = left {
+				wire_values.entry(wr).or_insert(None);
+				let gate_refs = wire_gates.entry(wr).or_insert(Vec::new());
+				gate_refs.push(gate_ref);
+			}
+			if let Some(Operand::WireRef(wr)) = right {
+				wire_values.entry(wr).or_insert(None);
+				let gate_refs = wire_gates.entry(wr).or_insert(Vec::new());
+				gate_refs.push(gate_ref);
+			}
+			wire_values.entry(result_ref).or_insert(None);
+			wire_gates.entry(result_ref).or_insert(Vec::new());
+			
+			if let Some(update_ref) = Simulation::update_result(gates.get(gate_ref), &mut wire_values) {
+				Simulation::update_dependent_gates(update_ref, gates, wire_gates, wire_values);
+			}
+		}
+	}
 	
-	fn update_result(&self, gate_ref: GateRef, wire_values: &mut HashMap<WireRef, Option<u16>>) -> Option<WireRef> {
-		let gate = self.get(gate_ref);
+	fn update_dependent_gates(wire_ref: WireRef, gates: &Gates, wire_gates: &HashMap<WireRef, Vec<GateRef>>, wire_values: &mut HashMap<WireRef, Option<u16>>) {
+		//println!("{}", std::convert::Into::<&str>::into(&wire_ref));
+		for gate_ref in wire_gates[&wire_ref].iter() {
+			if let Some(update_ref) = Simulation::update_result(gates.get(*gate_ref), wire_values) {
+				Simulation::update_dependent_gates(update_ref, gates, wire_gates, wire_values);
+			}
+		}
+	}
+
+	fn update_result(gate: &Gate, wire_values: &mut HashMap<WireRef, Option<u16>>) -> Option<WireRef> {
 		match gate {
 			&Gate::And(Infix {op_left, op_right, result_ref}) => {
 				match (op_left.value(wire_values), op_right.value(wire_values), wire_values[&result_ref]) {
@@ -166,45 +224,6 @@ impl Gates {
 			}
 		}
 	}
-	
-	fn update_dependent_gates(&self, wire_ref: WireRef, wire_gates: &HashMap<WireRef, Vec<GateRef>>, wire_values: &mut HashMap<WireRef, Option<u16>>) {
-		//println!("{}", std::convert::Into::<&str>::into(&wire_ref));
-		for gate_ref in wire_gates[&wire_ref].iter() {
-			if let Some(update_ref) = self.update_result(*gate_ref, wire_values) {
-				self.update_dependent_gates(update_ref, wire_gates, wire_values);
-			}
-		}
-	}
-}
-
-fn simulate(input: &str) -> HashMap<WireRef, Option<u16>> {
-	let mut wire_values = HashMap::<WireRef, Option<u16>>::new();
-	let mut wire_gates = HashMap::<WireRef, Vec<GateRef>>::new();
-	let mut gates = Gates::new();
-	input.split("\r\n")
-	     .for_each(|s| {
-			let gate = parse_gate(s);
-			let (left, right, result_ref) = gate.wires();
-			let gate_ref = gates.add(gate);
-			
-			if let Operand::WireRef(wr) = left {
-				wire_values.entry(wr).or_insert(None);
-				let gate_refs = wire_gates.entry(wr).or_insert(Vec::new());
-				gate_refs.push(gate_ref);
-			}
-			if let Some(Operand::WireRef(wr)) = right {
-				wire_values.entry(wr).or_insert(None);
-				let gate_refs = wire_gates.entry(wr).or_insert(Vec::new());
-				gate_refs.push(gate_ref);
-			}
-			wire_values.entry(result_ref).or_insert(None);
-			wire_gates.entry(result_ref).or_insert(Vec::new());
-			
-			if let Some(update_ref) = gates.update_result(gate_ref, &mut wire_values) {
-				gates.update_dependent_gates(update_ref, &wire_gates, &mut wire_values);
-			}
-		 });
-	wire_values
 }
 
 fn read_input<P: AsRef<Path>>(path: P) -> String {
@@ -287,11 +306,132 @@ fn parse_wire_ref(s: &str) -> WireRef {
 }
 
 /*
+let mut updated = HashSet::new();
+let b_ref = WireRef([b'b', b' ']);
+
+sim.wire_values.insert(b_ref, Some(46065));
+updated.insert(b_ref);
+Simulation::force_update_dependent_gates(b_ref, &sim.gates, &sim.wire_gates, &mut sim.wire_values, &mut updated);
+
+println!("\r\nPart 2:");
+print_values(&sim.wire_values);
+*/
+
+/*
+impl Simulation {
+	fn force_update_dependent_gates(wire_ref: WireRef,
+									gates: &Gates,
+									wire_gates: &HashMap<WireRef, Vec<GateRef>>,
+									wire_values: &mut HashMap<WireRef, Option<u16>>,
+									updated: &mut HashSet<WireRef>)
+	{
+		for gate_ref in wire_gates[&wire_ref].iter() {
+			if let Some(update_ref) = Simulation::force_update_result(gates.get(*gate_ref), wire_values, updated) {
+				Simulation::force_update_dependent_gates(update_ref, gates, wire_gates, wire_values, updated);
+			}
+		}
+	}
+
+	fn force_update_result(gate: &Gate, wire_values: &mut HashMap<WireRef, Option<u16>>, updated: &mut HashSet<WireRef>) -> Option<WireRef> {
+		match gate {
+			&Gate::And(Infix {op_left, op_right, result_ref}) => {
+				match (op_left.value(wire_values), op_right.value(wire_values), updated.contains(&result_ref)) {
+					(Some(left_val), Some(right_val), false) => {
+						let result = wire_values.get_mut(&result_ref).unwrap();
+						*result = Some(left_val & right_val);
+						updated.insert(result_ref);
+						Some(result_ref)
+					}
+					_ => None
+				}
+			},
+			&Gate::Or(Infix {op_left, op_right, result_ref}) => {
+				match (op_left.value(wire_values), op_right.value(wire_values), updated.contains(&result_ref)) {
+					(Some(left_val), Some(right_val), false) => {
+						let result = wire_values.get_mut(&result_ref).unwrap();
+						*result = Some(left_val | right_val);
+						updated.insert(result_ref);
+						Some(result_ref)
+					}
+					_ => None
+				}
+			},
+			&Gate::LShift(Infix {op_left, op_right, result_ref}) => {
+				match (op_left.value(wire_values), op_right.value(wire_values), updated.contains(&result_ref)) {
+					(Some(left_val), Some(right_val), false) => {
+						let result = wire_values.get_mut(&result_ref).unwrap();
+						*result = Some(left_val << right_val);
+						updated.insert(result_ref);
+						Some(result_ref)
+					}
+					_ => None
+				}
+			},
+			&Gate::RShift(Infix {op_left, op_right, result_ref}) => {
+				match (op_left.value(wire_values), op_right.value(wire_values), updated.contains(&result_ref)) {
+					(Some(left_val), Some(right_val), false) => {
+						let result = wire_values.get_mut(&result_ref).unwrap();
+						*result = Some(left_val >> right_val);
+						updated.insert(result_ref);
+						Some(result_ref)
+					}
+					_ => None
+				}
+			}
+			&Gate::Not(Prefix {op, result_ref}) => {
+				match (op.value(wire_values), updated.contains(&result_ref)) {
+					(Some(val), false) => {
+						let result = wire_values.get_mut(&result_ref).unwrap();
+						*result = Some(!val);
+						updated.insert(result_ref);
+						Some(result_ref)
+					}
+					_ => None
+				}
+			}
+		}
+	}
+}
+*/
+
+/*
 impl<'a> From<&'a WireRef> for String {
 	fn from(w: &'a WireRef) -> String {
 		let s: &str = w.into();
 		String::from(w)
 	}
+}
+*/
+
+/*
+fn simulate(input: &str) -> HashMap<WireRef, Option<u16>> {
+	let mut wire_values = HashMap::<WireRef, Option<u16>>::new();
+	let mut wire_gates = HashMap::<WireRef, Vec<GateRef>>::new();
+	let mut gates = Gates::new();
+	input.split("\r\n")
+	     .for_each(|s| {
+			let gate = parse_gate(s);
+			let (left, right, result_ref) = gate.wires();
+			let gate_ref = gates.add(gate);
+			
+			if let Operand::WireRef(wr) = left {
+				wire_values.entry(wr).or_insert(None);
+				let gate_refs = wire_gates.entry(wr).or_insert(Vec::new());
+				gate_refs.push(gate_ref);
+			}
+			if let Some(Operand::WireRef(wr)) = right {
+				wire_values.entry(wr).or_insert(None);
+				let gate_refs = wire_gates.entry(wr).or_insert(Vec::new());
+				gate_refs.push(gate_ref);
+			}
+			wire_values.entry(result_ref).or_insert(None);
+			wire_gates.entry(result_ref).or_insert(Vec::new());
+			
+			if let Some(update_ref) = gates.update_result(gate_ref, &mut wire_values) {
+				gates.update_dependent_gates(update_ref, &wire_gates, &mut wire_values);
+			}
+		 });
+	wire_values
 }
 */
 
@@ -326,9 +466,6 @@ impl Infix {
 
 impl Gate {
 	fn evaluate(&self, wires: &mut HashMap<WireRef, Wire>, gates: &mut Gates) {
-		
-		
-		
 		for gate_ref in wire.gates.iter() {
 			gates.get(gate_ref).evaluate(wires, gates);
 		}
@@ -354,3 +491,70 @@ impl Gate {
 	}
 }
 */
+
+/*
+	fn update_result(&self, gate_ref: GateRef, wire_values: &mut HashMap<WireRef, Option<u16>>) -> Option<WireRef> {
+		let gate = self.get(gate_ref);
+		match gate {
+			&Gate::And(Infix {op_left, op_right, result_ref}) => {
+				match (op_left.value(wire_values), op_right.value(wire_values), wire_values[&result_ref]) {
+					(Some(left_val), Some(right_val), None) => {
+						let result = wire_values.get_mut(&result_ref).unwrap();
+						*result = Some(left_val & right_val);
+						Some(result_ref)
+					}
+					_ => None
+				}
+			},
+			&Gate::Or(Infix {op_left, op_right, result_ref}) => {
+				match (op_left.value(wire_values), op_right.value(wire_values), wire_values[&result_ref]) {
+					(Some(left_val), Some(right_val), None) => {
+						let result = wire_values.get_mut(&result_ref).unwrap();
+						*result = Some(left_val | right_val);
+						Some(result_ref)
+					}
+					_ => None
+				}
+			},
+			&Gate::LShift(Infix {op_left, op_right, result_ref}) => {
+				match (op_left.value(wire_values), op_right.value(wire_values), wire_values[&result_ref]) {
+					(Some(left_val), Some(right_val), None) => {
+						let result = wire_values.get_mut(&result_ref).unwrap();
+						*result = Some(left_val << right_val);
+						Some(result_ref)
+					}
+					_ => None
+				}
+			},
+			&Gate::RShift(Infix {op_left, op_right, result_ref}) => {
+				match (op_left.value(wire_values), op_right.value(wire_values), wire_values[&result_ref]) {
+					(Some(left_val), Some(right_val), None) => {
+						let result = wire_values.get_mut(&result_ref).unwrap();
+						*result = Some(left_val >> right_val);
+						Some(result_ref)
+					}
+					_ => None
+				}
+			}
+			&Gate::Not(Prefix {op, result_ref}) => {
+				match (op.value(wire_values), wire_values[&result_ref]) {
+					(Some(val), None) => {
+						let result = wire_values.get_mut(&result_ref).unwrap();
+						*result = Some(!val);
+						Some(result_ref)
+					}
+					_ => None
+				}
+			}
+		}
+	}
+	
+	fn update_dependent_gates(&self, wire_ref: WireRef, wire_gates: &HashMap<WireRef, Vec<GateRef>>, wire_values: &mut HashMap<WireRef, Option<u16>>) {
+		//println!("{}", std::convert::Into::<&str>::into(&wire_ref));
+		for gate_ref in wire_gates[&wire_ref].iter() {
+			if let Some(update_ref) = self.update_result(*gate_ref, wire_values) {
+				self.update_dependent_gates(update_ref, wire_gates, wire_values);
+			}
+		}
+	}
+	*/
