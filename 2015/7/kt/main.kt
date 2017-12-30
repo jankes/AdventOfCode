@@ -5,7 +5,7 @@ import java.io.File
 fun main(args: Array<String>) {
     val wires = HashMap<String, Wire>()
 
-    val input = File("C:\\Users\\sjank\\Documents\\Projects\\AdventOfCode\\2015\\7\\input.txt")
+    val input = File("C:\\Users\\sjank\\Documents\\Projects\\AdventOfCode\\2015\\7\\input2.txt")
     input.forEachLine {
         val parts = it.split(' ')
         val gate: Gate
@@ -59,7 +59,7 @@ fun parseDirectSet(parts: List<String>, wires: HashMap<String, Wire>): Gate {
 
 fun parseInput(str: String, wires: HashMap<String, Wire>): Input {
     if (str.startsWithNumber()) {
-        return Input.Literal(str.toInt().toShort())
+        return Input.Literal(str.toInt())
     } else {
         val wire = parseWire(str, wires)
         return Input.Wire(wire)
@@ -84,7 +84,7 @@ fun String.startsWithNumber(): Boolean {
 }
 
 sealed class Input {
-    data class Literal(val value: Short) : Input() {
+    data class Literal(val value: Int) : Input() {
         override fun toString(): String = value.toString()
     }
 
@@ -100,7 +100,7 @@ fun Input.hasValue(): Boolean {
     }
 }
 
-fun Input.value(): Short {
+fun Input.value(): Int {
     return when (this) {
         is Input.Literal -> this.value
         is Input.Wire -> wire.value
@@ -109,7 +109,7 @@ fun Input.value(): Short {
 
 class Wire(val name: String) {
     var hasValue = false
-    var value: Short = 0
+    var value: Int = 0
     val gates = mutableListOf<Gate>()
 
     override fun toString() = if (hasValue) {
@@ -173,35 +173,35 @@ class OneInputGate(val updateFun: UnaryOp, val left: Input, val result: Wire) : 
     override fun toString(): String = "$updateFun $left -> $result"
 }
 
-open class BinaryOp(val fn: (Short, Short) -> Short)
+open class BinaryOp(val fn: (Int, Int) -> Int)
 
-open class UnaryOp(val fn: (Short) -> Short)
+open class UnaryOp(val fn: (Int) -> Int)
 
-object And: BinaryOp({a, b -> (a.toInt() and b.toInt()).toShort()}) {
+object And: BinaryOp({a, b -> a and b}) {
     override fun toString(): String {
         return "And"
     }
 }
 
-object Or: BinaryOp({a, b -> (a.toInt() or b.toInt()).toShort()}) {
+object Or: BinaryOp({a, b -> a or b}) {
     override fun toString(): String {
         return "Or"
     }
 }
 
-object RShift: BinaryOp({a, b -> (a.toInt() ushr b.toInt()).toShort()}) {
+object RShift: BinaryOp({a, b -> a ushr b}) {
     override fun toString(): String {
         return "RShift"
     }
 }
 
-object LShift: BinaryOp({a, b -> (a.toInt() shl b.toInt()).toShort()}) {
+object LShift: BinaryOp({a, b -> a shl b}) {
     override fun toString(): String {
         return "LShift"
     }
 }
 
-object Not: UnaryOp({a -> a.toInt().inv().toShort()}) {
+object Not: UnaryOp({a -> a.inv()}) {
     override fun toString(): String {
         return "Not"
     }
