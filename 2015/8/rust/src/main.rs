@@ -12,16 +12,36 @@ fn main() {
                                .map(count_in_memory_chars)
                                .fold(0i32, |total, count| total + count);
     
+    let escaped_chars = input.lines()
+                             .map(count_escaped_chars)
+                             .fold(0i32, |total, count| total + count);
+
     println!("total chars = {}", total_chars);
     println!("in memory chars = {}", in_memory_chars);
-    println!("difference = {}", total_chars - in_memory_chars);
+    println!("escaped chars = {}", escaped_chars);
+    println!("total_chars - in_memory_chars = {}", total_chars - in_memory_chars);
+    println!("escaped_chars - total_chars = {}", escaped_chars - total_chars);
 }
 
-enum State {
-    MemoryChar, Esc, Hex1, Hex2
+fn count_escaped_chars(s: &str) -> i32 {
+    let mut count = 0i32;
+    let bytes = s.as_bytes();
+    for b in bytes[1..s.len() - 1].iter() {
+        count += 1;
+        if *b == b'"' || *b == b'\\' {
+            count += 1;
+        }
+    }
+    count += 4;  // escaped surrounding quotes
+    count += 2; // surrounding quotes for string literal
+    count
 }
 
 fn count_in_memory_chars(s: &str) -> i32 {
+    enum State {
+        MemoryChar, Esc, Hex1, Hex2
+    }
+
     let mut count = 0i32;
     let mut state = State::MemoryChar;
     let bytes = s.as_bytes();
