@@ -1,0 +1,5 @@
+[package]
+
+name = "aoc2015_9"
+version = "0.0.1"
+authors = ["Scott Janke"]
