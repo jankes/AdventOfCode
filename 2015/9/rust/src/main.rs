@@ -5,21 +5,13 @@ use std::str;
 use std::str::FromStr;
 
 fn main() {
-	/*
-	let d1 = Distances::new();
-	let d2 = read_distances();
-	
-	println!("{}", d1.0 == d2.0);
-	*/
+	let distances = read_distances();
 
-	let mut test = [0u8, 1, 2, 3, ];
-	print_permutations(&mut test, 0);
 
-	/*
-	let min = find_shortest_route();
+	let min = find_shortest_route(&distances);
 	println!("shortest distance is: {}", min);
 
-	let distances = Distances::new();
+	/*
 	let route = [0u8, 1, 2, 3, 4, 5, 6, 7];
 	let test = route.windows(2)
                     .map(|r| distances.get(r[0] as usize, r[1] as usize))
@@ -31,6 +23,7 @@ fn main() {
 struct Distances(Vec<u16>);
 
 impl Distances {
+	/*
 	fn new() -> Distances {
 		Distances(
 			vec!(0u16,  65, 129, 144,  71, 137,   3, 149,
@@ -43,6 +36,7 @@ impl Distances {
 			      149,  14, 143, 115,  96,  14,  46,   0)
 		)
 	}
+	*/
 
 	fn get(&self, from: usize, to: usize) -> u16 {
 		self.0[8 * from + to]
@@ -54,24 +48,23 @@ impl Distances {
 	}
 }
 
-fn find_shortest_route() -> u16 {
+fn find_shortest_route(distances: &Distances) -> u16 {
 	let mut min = u16::max_value();
-	let distances = Distances::new();
 	let mut route = [0u8, 1, 2, 3, 4, 5, 6, 7];
-	find_shortest_route_helper(&distances, &mut route, 0, 7, &mut min);
+	find_shortest_route_helper(&distances, &mut route, 0, &mut min);
 	min
 }
 
-fn find_shortest_route_helper(distances: &Distances, route: &mut [u8], left: u8, right: u8, min: &mut u16) {
-	if right - left == 1 {
+fn find_shortest_route_helper(distances: &Distances, route: &mut [u8], left: usize, min: &mut u16) {	
+	if route.len() - left == 2 {
 		update_min_route_distance(distances, route, min);
-		route.swap(left as usize, right as usize);
+		rotate(route, left);
 		update_min_route_distance(distances, route, min);
+		rotate(route, left);
 	} else {
-		find_shortest_route_helper(distances, route, left + 1, right, min);
-		for _ in 0..(right - left) {
-			route.swap(left as usize, right as usize);
-			find_shortest_route_helper(distances, route, left + 1, right, min);
+		for _ in 0..route.len() - left {
+			find_shortest_route_helper(distances, route, left + 1, min);
+			rotate(route, left);
 		}
 	}	
 }
@@ -85,15 +78,20 @@ fn update_min_route_distance(distances: &Distances, route: &[u8], min: &mut u16)
 	}
 }
 
+fn rotate(s: &mut [u8], start: usize) {
+	for i in start..s.len() - 1 {
+		s.swap(i, i + 1);
+	}
+}
+
 /*
 fn test_stuff() {
-	//let mut test = [b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7'];
-	let mut test = [0, 1, 2, 3];
-	let right = test.len() - 1;
-	print_permutations(&mut test, 0, right);
+	let mut test = [0u8, 1, 2, 3, ];
+	print_permutations(&mut test, 0);
 }
 */
 
+/*
 fn print_permutations(s: &mut [u8], left: usize) {
 	if s.len() - left == 2 {
 		print_slice(s);
@@ -109,21 +107,28 @@ fn print_permutations(s: &mut [u8], left: usize) {
 	}
 }
 
-fn rotate(s: &mut [u8], start: usize) {
-	for i in start..s.len() - 1 {
-		s.swap(i, i + 1);
-	}
-}
-
 fn print_slice(s: &[u8]) {
 	for c in s {
 		print!("{} ", *c);
 	}
 	println!();
 }
+*/
 
 fn read_distances() -> Distances {
-	
+	let mut distances = Distances((0u16..64).map(|_| 0).collect::<Vec<u16>>());
+
+	let input = read_input("C:\\Users\\sjank\\Documents\\Projects\\AdventOfCode\\2015\\9\\input.txt");
+	for line in input.lines() {
+		let parts = line.split(' ').collect::<Vec<&str>>();
+		let from = get_city_number(parts[0]);
+		let to = get_city_number(parts[2]);
+		let value = u16::from_str(parts[4]).unwrap();
+		distances.set(to, from, value);
+	}
+
+	return distances;
+
 	fn get_city_number(city_name: &str) -> usize {
 		match city_name {
 			"Faerun"        => 0,
@@ -137,19 +142,6 @@ fn read_distances() -> Distances {
 			_ => panic!("unknown city")
 		}
 	}
-	
-	let mut distances = Distances((0u16..64).map(|_| 0).collect::<Vec<u16>>());
-
-	let input = read_input("C:\\Users\\sjank\\Documents\\Projects\\AdventOfCode\\2015\\9\\input.txt");
-	for line in input.lines() {
-		let parts = line.split(' ').collect::<Vec<&str>>();
-		let from = get_city_number(parts[0]);
-		let to = get_city_number(parts[2]);
-		let value = u16::from_str(parts[4]).unwrap();
-		distances.set(to, from, value);
-	}
-
-	distances
 }
 
 fn read_input<P: AsRef<Path>>(path: P) -> String {
