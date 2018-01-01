@@ -18,6 +18,9 @@ fn main() {
 	                .fold(0, |total_distance, from_to_distance| total_distance + from_to_distance);
 	println!("test = {}", test);
 	*/
+
+	let (min, max) = find_min_max_route_distances(&distances);
+	println!("min = {}, max = {}", min, max);
 }
 
 struct Distances(Vec<u16>);
@@ -66,7 +69,28 @@ fn find_shortest_route_helper(distances: &Distances, route: &mut [u8], left: usi
 			find_shortest_route_helper(distances, route, left + 1, min);
 			rotate(route, left);
 		}
-	}	
+	}
+}
+
+fn find_min_max_route_distances(distances: &Distances) -> (u16, u16) {
+	let mut route = [0u8, 1, 2, 3, 4, 5, 6, 7];
+	let mut min = u16::max_value();
+	let mut max = 0; 
+	{
+		let mut update = |route: &[u8]| {
+			let distance = route.windows(2)
+								.map(|r| distances.get(r[0] as usize, r[1] as usize))
+								.fold(0, |total_distance, from_to_distance| total_distance + from_to_distance);
+			if distance < min {
+				min = distance;
+			}
+			if distance > max {
+				max = distance;
+			}
+		};
+		enumerate_permutations(&mut route, &mut update);	
+	}
+	(min, max)
 }
 
 fn update_min_route_distance(distances: &Distances, route: &[u8], min: &mut u16) {
@@ -75,6 +99,24 @@ fn update_min_route_distance(distances: &Distances, route: &[u8], min: &mut u16)
 	                    .fold(0, |total_distance, from_to_distance| total_distance + from_to_distance);
 	if distance < *min {
 		*min = distance;
+	}
+}
+
+fn enumerate_permutations<F: FnMut(&[u8])>(s: &mut [u8], callback: &mut F) {
+	enumerate_permutations_helper(s, 0, callback);
+}
+
+fn enumerate_permutations_helper<F: FnMut(&[u8])>(s: &mut [u8], left: usize, callback: &mut F) {
+	if s.len() - left == 2 {
+		callback(s);
+		rotate(s, left);
+		callback(s);
+		rotate(s, left);
+	} else {
+		for _ in 0..s.len() - left {
+			enumerate_permutations_helper(s, left + 1, callback);
+			rotate(s, left);
+		}
 	}
 }
 
