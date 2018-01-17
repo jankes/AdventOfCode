@@ -75,7 +75,10 @@ mod part_2 {
                 _    => panic!("unexpected token after object value: {}", *b)
             };
         }
-        json_obj_sum
+        match json_obj_sum {
+            Black(sum) => Black(sum),
+            Red        => Black(0)
+        }
     }
 
     fn sum_array(it: &mut Peekable<slice::Iter<u8>>) -> Sum {
@@ -240,7 +243,7 @@ mod part_2 {
         #[test]
         fn sum_object_3() {
             let obj = b"{\"test\":\"aaa\",\"xyz\":\"red\",\"test_2\":\"green\"}";
-            assert_eq!(Red, sum_object(&mut obj.iter().peekable()));
+            assert_eq!(Black(0), sum_object(&mut obj.iter().peekable()));
         }
 
         #[test]
@@ -252,29 +255,38 @@ mod part_2 {
         #[test]
         fn sum_object_5() {
             let obj = b"{\"one\":\"green\",\"two\":{\"three\":\"blue\",\"four\":\"red\"}}";
-            assert_eq!(Red, sum_object(&mut obj.iter().peekable()));
+            assert_eq!(Black(0), sum_object(&mut obj.iter().peekable()));
         }
 
         #[test]
         fn sum_object_6() {
             let obj = b"{\"one\":\"green\",\"two\":{\"three\":\"blue\",\"four\":\"red\",\"five\":\"purple\"},\"six\":\"brown\"}";
-            assert_eq!(Red, sum_object(&mut obj.iter().peekable()));
+            assert_eq!(Black(0), sum_object(&mut obj.iter().peekable()));
         }
 
         #[test]
         fn sum_object_7() {
             let obj = b"{\"a\":1}";
-            assert_eq!(Black(1), sum_object(&mut obj.iter().peekable()))
+            assert_eq!(Black(1), sum_object(&mut obj.iter().peekable()));
         }
 
         #[test]
         fn sum_object_8() {
             let obj = b"{\"a\":1,\"b\":3}";
-            assert_eq!(Black(4), sum_object(&mut obj.iter().peekable()))
+            assert_eq!(Black(4), sum_object(&mut obj.iter().peekable()));
         }
 
-        
+        #[test]
+        fn sum_object_9() {
+            let obj = b"{\"x\":{\"a\":1,\"b\":3},\"y\":{\"c\":{\"d\":\"blue\",\"e\":100,\"f\":\"red\"}},\"g\":-20}";
+            assert_eq!(Black(-16), sum_object(&mut obj.iter().peekable()));
+        }
 
+        #[test]
+        fn sum_object_10() {
+            let obj = b"{\"x\":{\"a\":1,\"b\":3},\"y\":{\"c\":{\"d\":\"blue\",\"e\":100,\"f\":\"red\"},\"def\":200},\"g\":-20}";;
+            assert_eq!(Black(184), sum_object(&mut obj.iter().peekable()));
+        }
     }
 }
 
