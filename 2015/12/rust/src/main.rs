@@ -6,7 +6,10 @@ use std::path::Path;
 fn main() {
     if let Ok(input) = read_input("C:\\Users\\jankes\\Documents\\AdventOfCode\\2015\\12\\input.json") {
         let sum = ::part_1::sum_numbers(&input);
-        println!("sum of numbers = {}", sum);
+        println!("part 1: sum of numbers = {}", sum);
+
+        let sum = ::part_2::sum_numbers(&input);
+        println!("part 2: sum of numbers = {}", sum);
     }
 }
 
@@ -36,6 +39,14 @@ mod part_2 {
     use std::iter::Peekable;
     use self::Sum::{Black, Red};
     use super::{is_digit, is_minus_sign};
+
+    pub fn sum_numbers(input: &[u8]) -> i32 {
+        if let Black(sum) = sum_value(&mut input.iter().peekable()) {
+            sum
+        } else {
+            0
+        }
+    }
 
     fn sum_value(it: &mut Peekable<slice::Iter<u8>>) -> Sum {
         match it.peek() {
@@ -82,7 +93,22 @@ mod part_2 {
     }
 
     fn sum_array(it: &mut Peekable<slice::Iter<u8>>) -> Sum {
-        Black(0)
+        it.next().expect("should have byte for opening bracket of array");
+
+        let mut array_sum = 0;
+        loop {
+            if let Black(val_sum) = sum_value(it) {
+                array_sum += val_sum;
+            }
+
+            let b = it.next().expect("expect comma or close bracket after value in array");
+            match *b {
+                b',' => continue,
+                b']' => break,
+                _    => panic!("unexpected token after object value: {}", *b)
+            };
+        }
+        Black(array_sum)
     }
 
     fn sum_string(it: &mut Peekable<slice::Iter<u8>>) -> Sum {
@@ -286,6 +312,30 @@ mod part_2 {
         fn sum_object_10() {
             let obj = b"{\"x\":{\"a\":1,\"b\":3},\"y\":{\"c\":{\"d\":\"blue\",\"e\":100,\"f\":\"red\"},\"def\":200},\"g\":-20}";;
             assert_eq!(Black(184), sum_object(&mut obj.iter().peekable()));
+        }
+
+        #[test]
+        fn sum_array_1() {
+            let array = b"[\"one\",\"two\",\"three\"]";
+            assert_eq!(Black(0), sum_array(&mut array.iter().peekable()));
+        }
+
+        #[test]
+        fn sum_array_2() {
+            let array = b"[1,2,3]";
+            assert_eq!(Black(6), sum_array(&mut array.iter().peekable()));
+        }
+
+        #[test]
+        fn sum_array_3() {
+            let array = b"[1,\"red\",3]";
+            assert_eq!(Black(4), sum_array(&mut array.iter().peekable()));
+        }
+
+        #[test]
+        fn sum_array_4() {
+            let array = b"[1,{\"c\":\"red\",\"b\":2},13]";
+            assert_eq!(Black(14), sum_array(&mut array.iter().peekable()));
         }
     }
 }
