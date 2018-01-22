@@ -1,5 +1,3 @@
-//use std::fmt::Debug;
-
 fn main() {
 	println!("part 1 example:");
 	{
