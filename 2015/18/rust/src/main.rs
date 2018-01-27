@@ -2,12 +2,14 @@ use std::fs::OpenOptions;
 use std::io::Read;
 use std::path::Path;
 
+mod with_dynamic;
 mod with_traits;
 
 fn main() {
     let grid_string = read_input("C:\\Users\\jankes\\Documents\\AdventOfCode\\2015\\18\\input.txt");
 
     with_traits::run(&grid_string);
+    with_dynamic::run(&grid_string);
 }
 
 fn read_input<P: AsRef<Path>>(path: P) -> String {

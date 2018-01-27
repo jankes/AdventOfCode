@@ -1,19 +1,18 @@
-use std::{self, fmt, mem};
-use std::marker::PhantomData;
+use std::{fmt, mem};
 
 pub fn run(grid_string: &str) {
     println!("--------------------------");
-    println!("with traits ...");
+    println!("with function pointers ...");
     println!("--------------------------");
-    example::<Part1>("EXAMPLE part 1:");
-    example::<Part2>("EXAMPLE part 2:");
-    do_steps::<Part1>("PART 1", &grid_string);
-    do_steps::<Part2>("PART 2", &grid_string);
+    example("EXAMPLE part 1:", part1_get);
+    example("EXAMPLE part 2:", part2_get);
+    do_steps("PART 1", grid_string, part1_get);
+    do_steps("PART 2", grid_string, part2_get);
 }
 
-fn do_steps<G: Get>(message: &str, grid_string: &str) {
-    let mut grid = Grid::<G>::parse(&grid_string);
-    let mut temp = Grid::<G>::new(100);
+fn do_steps(message: &str, grid_string: &str, getter: GetFn) {
+    let mut grid = Grid::parse(getter, grid_string);
+    let mut temp = Grid::new(getter, 100);
 
     let (mut current, mut next) = (&mut grid, &mut temp);
     for _ in 0..100 {
@@ -24,7 +23,7 @@ fn do_steps<G: Get>(message: &str, grid_string: &str) {
     println!("Ater 100 steps, there are {} lights on", current.count_total_on());
 }
 
-fn example<G: Get>(message: &str) {
+fn example(message: &str, getter: GetFn) {
     let mut test = String::with_capacity(36);
     test += ".#.#.#\r\n";
     test += "...##.\r\n";
@@ -33,8 +32,9 @@ fn example<G: Get>(message: &str) {
     test += "#.#..#\r\n";
     test += "####..\r\n";
 
-    let mut temp = Grid::<G>::new(6);
-    let mut grid = Grid::<G>::parse(&test);
+    let mut temp = Grid::new(getter, 6);
+    let mut grid = Grid::parse(getter, &test);
+
     set_to_self(&mut grid, 1, 1);
     set_to_self(&mut grid, 1, 6);
     set_to_self(&mut grid, 6, 1);
@@ -47,34 +47,32 @@ fn example<G: Get>(message: &str) {
     for i in 0..4 {
         Grid::update(current, next);
         println!("{}.\r\n{}", i + 1, next);
-        std::mem::swap(&mut current, &mut next);
+        mem::swap(&mut current, &mut next);
     }
     println!("after 4 steps, grid is:");
     println!("{}", current);
     println!("lights on = {}", current.count_total_on());
 }
 
-fn set_to_self<G: Get>(grid: &mut Grid<G>, row: usize, col: usize) {
+fn set_to_self(grid: &mut Grid, row: usize, col: usize) {
     let state = grid.get(row, col);
     grid.set(row, col, state);
 }
 
-trait Get {
-    fn get<G: Get>(grid: &Grid<G>, row: usize, col: usize) -> bool;
-}
+type GetFn = fn(&Grid, usize, usize) -> bool; 
 
-struct Grid<G: Get> {
-    getter: PhantomData<G>,
+struct Grid {
+    getter: GetFn,
     size: usize,
     cells: Vec<bool>
 }
 
-impl<G: Get> Grid<G> {
-    fn new(size: usize) -> Grid<G> {
+impl Grid {
+    fn new(getter: GetFn, size: usize) -> Grid {
         Grid {
-            getter: PhantomData,
+            getter: getter,
             size: size,
-            cells: Grid::<G>::filled_vec(size * size, false)
+            cells: Grid::filled_vec(size * size, false)
         }
     }
 
@@ -84,11 +82,11 @@ impl<G: Get> Grid<G> {
         v
     }
 
-    fn parse(cells: &str) -> Grid<G> {
+    fn parse(getter: GetFn, cells: &str) -> Grid {
         let bytes = cells.as_bytes();
         Grid {
-            getter: PhantomData,
-            size: Grid::<G>::find_size(bytes),
+            getter: getter,
+            size: Grid::find_size(bytes),
             cells: bytes.iter()
                         .filter(|&&b| b != b'\r')
                         .filter(|&&b| b != b'\n')
@@ -118,7 +116,7 @@ impl<G: Get> Grid<G> {
         count
     }
 
-    fn update(current: &Grid<G>, next: &mut Grid<G>) {
+    fn update(current: &Grid, next: &mut Grid) {
         for row in 1..current.size + 1 {
             for col in 1..current.size + 1 {
                 let neighboors_on_count = current.count_neighboors_on(row, col);
@@ -162,7 +160,7 @@ impl<G: Get> Grid<G> {
     }
 
     fn get(&self, row: usize, col: usize) -> bool {
-        G::get(&self, row, col)
+        (self.getter)(&self, row, col)
     }
 
     fn set(&mut self, row: usize, col: usize, state: bool) {
@@ -170,28 +168,21 @@ impl<G: Get> Grid<G> {
     }
 }
 
-struct Part1();
-struct Part2();
-
-impl Get for Part1 {
-    fn get<G: Get>(grid: &Grid <G>, row: usize, col: usize) -> bool {
-        if is_out_of_bounds(grid.size, row, col) {
-            false
-        } else {
-            grid.cells[(grid.size * (row - 1)) + (col - 1)]
-        }
+fn part1_get(grid: &Grid, row: usize, col: usize) -> bool {
+    if is_out_of_bounds(grid.size, row, col) {
+        false
+    } else {
+        grid.cells[(grid.size * (row - 1)) + (col - 1)]
     }
 }
 
-impl Get for Part2 {
-    fn get<G: Get>(grid: &Grid <G>, row: usize, col: usize) -> bool {
-        if is_out_of_bounds(grid.size, row, col) {
-            false
-        } else if is_corner(grid.size, row, col) {
-            true
-        } else {
-            grid.cells[(grid.size * (row - 1)) + (col - 1)]
-        }
+fn part2_get(grid: &Grid, row: usize, col: usize) -> bool {
+    if is_out_of_bounds(grid.size, row, col) {
+        false
+    } else if is_corner(grid.size, row, col) {
+        true
+    } else {
+        grid.cells[(grid.size * (row - 1)) + (col - 1)]
     }
 }
 
@@ -206,7 +197,7 @@ fn is_corner(size: usize, row: usize, col: usize) -> bool {
     (row == size && col == size)
 }
 
-impl <G: Get> fmt::Display for Grid <G> {
+impl fmt::Display for Grid {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for row in 1..self.size + 1 {
             for col in 1..self.size + 1 {
