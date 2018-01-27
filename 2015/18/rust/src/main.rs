@@ -1,22 +1,27 @@
 use std::fmt;
 use std::fs::OpenOptions;
 use std::io::Read;
+use std::marker::PhantomData;
 use std::path::Path;
 
 fn main() {
     example();
-/*
+
     let grid_string = read_input("C:\\Users\\jankes\\Documents\\AdventOfCode\\2015\\18\\input.txt");
-    let mut grid = Grid::parse(&grid_string);
-    let mut temp = Grid::new(100);
+    part1(&grid_string);
+}
+
+fn part1(grid_string: &str) {
+    let mut grid = Grid::<Part1>::parse(&grid_string);
+    let mut temp = Grid::<Part1>::new(100);
 
     let (mut current, mut next) = (&mut grid, &mut temp);
     for _ in 0..100 {
         Grid::update(current, next);
         std::mem::swap(&mut current, &mut next);
     }
-    println!("after 100 steps, there are {} lights on", current.count_total_on());
-*/
+    println!("PART 1");
+    println!("Ater 100 steps, there are {} lights on", current.count_total_on());
 }
 
 fn example() {
@@ -28,9 +33,9 @@ fn example() {
     test += "#.#..#\r\n";
     test += "####..\r\n";
     let mut grid = Grid::<Part1>::parse(&test);
-/*
-    let mut temp = Grid::new(6);
+    let mut temp = Grid::<Part1>::new(6);
 
+    println!("EXAMPLE:");
     println!("initial\r\n{}", grid);
 
     let (mut current, mut next) = (&mut grid, &mut temp);
@@ -41,24 +46,23 @@ fn example() {
     }
     println!("after 4 steps, grid is:");
     println!("{}", current);
-*/
+    println!("lights on = {}", current.count_total_on());
 }
 
 trait Get {
-    //fn get<G: Get>(grid: &Grid<G>, row: usize, col: usize) -> bool;
-    fn get<G: Get>(grid: &Grid, row: usize, col: usize) -> bool;
+    fn get<G: Get>(grid: &Grid<G>, row: usize, col: usize) -> bool;
 }
 
-struct Grid /*<G: Get>*/ {
-    //getter: G,
+struct Grid<G: Get> {
+    getter: PhantomData<G>,
     size: usize,
     cells: Vec<bool>
 }
 
-impl<G: Get> Grid /*<G>*/ {
-    fn new(/*getter: G,*/ size: usize) -> Grid /*<G>*/ {
+impl<G: Get> Grid<G> {
+    fn new(size: usize) -> Grid<G> {
         Grid {
-            /*getter: getter,*/
+            getter: PhantomData,
             size: size,
             cells: Grid::<G>::filled_vec(size * size, false)
         }
@@ -70,10 +74,10 @@ impl<G: Get> Grid /*<G>*/ {
         v
     }
 
-    fn parse(/*getter: G,*/ cells: &str) -> Grid /*<G>*/ {
+    fn parse(cells: &str) -> Grid<G> {
         let bytes = cells.as_bytes();
         Grid {
-            /*getter: getter,*/
+            getter: PhantomData,
             size: Grid::<G>::find_size(bytes),
             cells: bytes.iter()
                         .filter(|&&b| b != b'\r')
@@ -97,7 +101,7 @@ impl<G: Get> Grid /*<G>*/ {
                   .sum()
     }
 
-    fn update(current: &Grid /*<G>*/, next: &mut Grid /*<G>*/) {
+    fn update(current: &Grid <G>, next: &mut Grid <G>) {
         for row in 1..current.size + 1 {
             for col in 1..current.size + 1 {
                 let neighboors_on_count = current.count_neighboors_on(row, col);
@@ -141,13 +145,6 @@ impl<G: Get> Grid /*<G>*/ {
     }
 
     fn get(&self, row: usize, col: usize) -> bool {
-        /*
-        if row == 0 || col == 0 || row == self.size + 1 || col == self.size + 1 {
-            false
-        } else {
-            self.cells[(self.size * (row - 1)) + (col - 1)]
-        }
-        */
         G::get(&self, row, col)
     }
 
@@ -159,7 +156,7 @@ impl<G: Get> Grid /*<G>*/ {
 struct Part1();
 
 impl Get for Part1 {
-    fn get<G: Get>(grid: &Grid /*<G>*/, row: usize, col: usize) -> bool {
+    fn get<G: Get>(grid: &Grid <G>, row: usize, col: usize) -> bool {
         if row == 0 || col == 0 || row == grid.size + 1 || col == grid.size + 1 {
             false
         } else {
@@ -168,7 +165,7 @@ impl Get for Part1 {
     }
 }
 
-impl /*<G: Get>*/ fmt::Display for Grid /*<G>*/ {
+impl <G: Get> fmt::Display for Grid <G> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for row in 1..self.size + 1 {
             for col in 1..self.size + 1 {
