@@ -6,24 +6,42 @@ use std::path::Path;
 use std::str;
 
 fn main() {	
-	let input = read_input("C:\\Users\\jankes\\Documents\\AdventOfCode\\2015\\19\\replacements.txt");
-	let replacements = parse_replacements(&input);
+	let replacement_input = read_input("C:\\Users\\jankes\\Documents\\AdventOfCode\\2015\\19\\replacements.txt");
+	let replacements = parse_replacements(&replacement_input);
+	let molecule = read_input("C:\\Users\\jankes\\Documents\\AdventOfCode\\2015\\19\\molecule.txt");
+
+	let mut replaced = HashSet::<Vec<u8>>::new();
+	for r in replacements.iter() {
+		if r.from_len() == 1 {
+			do_replacement_one_letter_target(r, molecule.as_bytes(), &mut replaced);
+		} else {
+			do_replacement_two_letter_target(r, molecule.as_bytes(), &mut replaced);
+		}
+	}
+	println!("found {} distinct molecules after one replacement", replaced.len());
+}
+
+/*
+fn test_stuff(replacements: &[Replacement]) {
 	for r in replacements.iter() {
 		println!("{}", r);
 	}
 
-	let r1 = &replacements[39];
+	let molecule = "aaHTi";
+	println!("molecule: {}", molecule);
+
+	let r1 = &replacements[15];
 	println!("from: {} to: {}", str::from_utf8(&r1.from[0..]).unwrap(), str::from_utf8(&r1.to[0..]).unwrap());
 
-	let molecule = "Ti".as_bytes();
 	let mut test = HashSet::<Vec<u8>>::new();
 
-	do_replacement_two_letter_target(r1, molecule, &mut test);
+	do_replacement_one_letter_target(r1, molecule.as_bytes(), &mut test);
 
 	for m in test.iter() {
 		println!("{}", str::from_utf8(&m).unwrap());
 	}
 }
+*/
 
 fn do_replacement_one_letter_target(replacement: &Replacement, molecule: &[u8], generated: &mut HashSet<Vec<u8>>) {
 	let mut start = 0usize;
@@ -84,11 +102,10 @@ fn find_next_two_letter(target: [u8; 2], molecule: &[u8]) -> Option<usize> {
 }
 
 fn generate_replacement(replacement: &Replacement, molecule: &[u8], index: usize) -> Vec<u8> {
-	let to_len = replacement.to_len();
-	let mut generated = Vec::<u8>::with_capacity(molecule.len() + to_len - replacement.from_len());
+	let mut generated = Vec::<u8>::with_capacity(molecule.len() + replacement.to_len() - replacement.from_len());
 	push_up_to_index(&mut generated, molecule, index);
 	push_replacement(&mut generated, replacement);
-	push_starting_at_index(&mut generated, molecule, index + 1);
+	push_starting_at_index(&mut generated, molecule, index + replacement.from_len());
 	generated
 }
 
@@ -128,10 +145,6 @@ impl Replacement {
 			from: [0u8; 2],
 			to: [0u8; 10]
 		}
-	}
-
-	fn is_from_one_letter(&self) -> bool {
-		self.from[1] == 0
 	}
 
 	fn from_len(&self) -> usize {
