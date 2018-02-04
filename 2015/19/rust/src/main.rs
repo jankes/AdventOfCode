@@ -2,11 +2,11 @@ use std::fs::OpenOptions;
 use std::io::Read;
 use std::path::Path;
 
-mod part1;
-//mod part2;
+//mod part1;
+mod part2;
 
 fn main() {	
-	part1::part1();
+	part2::part2();
 }
 
 fn read_input<P: AsRef<Path>>(path: P) -> String {
