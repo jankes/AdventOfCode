@@ -1,0 +1,8 @@
+[package]
+
+name = "aoc2015_72"
+version = "0.0.1"
+authors = ["Scott Janke"]
+
+[dependencies]
+typed-arena = "1.3.0"
