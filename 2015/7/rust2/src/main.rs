@@ -29,16 +29,16 @@ fn connect_wires<'a>(gate: &'a Gate<'a>) {
         &Signal::And(ref left, ref right) |
         &Signal::Or(ref left, ref right)  => {
             if let &Operand::FromWire(ref left) = left {
-                left.get().outputs.borrow_mut().push(gate);
+                left.outputs.borrow_mut().push(gate);
             }
             if let &Operand::FromWire(ref right) = right {
-                right.get().outputs.borrow_mut().push(gate);
+                right.outputs.borrow_mut().push(gate);
             }
         },
         &Signal::LShift(ref wire, _) |
         &Signal::RShift(ref wire, _) |
         &Signal::Not(ref wire) |
-        &Signal::FromWire(ref wire) => wire.get().outputs.borrow_mut().push(gate),
+        &Signal::FromWire(ref wire) => wire.outputs.borrow_mut().push(gate),
         &Signal::Constant(_) => ()
     };
 }
@@ -79,14 +79,14 @@ fn parse_lshift_gate<'a>(line: &str,
                          arena: &'a ComponentArena<'a>,
                          wires: &mut HashMap<[u8; 2], &'a Wire<'a>>) -> &'a Gate<'a> {
     let (left, right, output) = parse_shift_gate(line, arena, wires);
-    arena.alloc_gate(Signal::LShift(Cell::new(left), right), output)
+    arena.alloc_gate(Signal::LShift(left, right), output)
 }
 
 fn parse_rshift_gate<'a>(line: &str,
                          arena: &'a ComponentArena<'a>,
                          wires: &mut HashMap<[u8; 2], &'a Wire<'a>>) -> &'a Gate<'a> {
     let (left, right, output) = parse_shift_gate(line, arena, wires);
-    arena.alloc_gate(Signal::RShift(Cell::new(left), right), output)
+    arena.alloc_gate(Signal::RShift(left, right), output)
 }
 
 fn parse_not_gate<'a>(line: &str,
@@ -97,7 +97,7 @@ fn parse_not_gate<'a>(line: &str,
     let input = parts.next().unwrap();
     let _arrow = parts.next().unwrap();
     let output = parts.next().unwrap();
-    arena.alloc_gate(Signal::Not(Cell::new(parse_wire(input, arena, wires))),
+    arena.alloc_gate(Signal::Not(parse_wire(input, arena, wires)),
                      parse_wire(output, arena, wires))
 }
 
@@ -112,7 +112,7 @@ fn parse_direct_set<'a>(line: &str,
     let output_wire = parse_wire(output, arena, wires);
     match input.as_bytes()[0] {
         b'0'...b'9' => arena.alloc_gate(Signal::Constant(parse_constant(input)), output_wire),
-        _           => arena.alloc_gate(Signal::FromWire(Cell::new(parse_wire(input, arena, wires))), output_wire)
+        _           => arena.alloc_gate(Signal::FromWire(parse_wire(input, arena, wires)), output_wire)
     }
 }
 
@@ -129,7 +129,7 @@ fn parse_boolean_gate<'a>(line: &str,
                         wires: &mut HashMap<[u8; 2], &'a Wire<'a>>) -> Operand<'a> {
         match s.as_bytes()[0] {
             b'0'...b'9' => Operand::Constant(parse_constant(s)),
-            _           => Operand::FromWire(Cell::new(parse_wire(s, arena, wires)))
+            _           => Operand::FromWire(parse_wire(s, arena, wires))
         }
     }
 }
@@ -209,10 +209,10 @@ struct Gate<'a> {
 enum Signal<'a> {
     And(Operand<'a>, Operand<'a>),
     Or(Operand<'a>, Operand<'a>),
-    LShift(Cell<&'a Wire<'a>>, u16),  // TODO: is Cell needed?
-    RShift(Cell<&'a Wire<'a>>, u16),
-    Not(Cell<&'a Wire<'a>>),
-    FromWire(Cell<&'a Wire<'a>>),
+    LShift(&'a Wire<'a>, u16),
+    RShift(&'a Wire<'a>, u16),
+    Not(&'a Wire<'a>),
+    FromWire(&'a Wire<'a>),
     Constant(u16)
 }
 
@@ -221,10 +221,10 @@ impl<'a> fmt::Display for Signal<'a> {
         match self {
             &Signal::And(ref left, ref right)    => write!(f, "{} AND {}", left, right),
             &Signal::Or(ref left, ref right)     => write!(f, "{} OR {}", left, right),
-            &Signal::LShift(ref wire, ref count) => write!(f, "{} LSHIFT {}", wire.get(), count),
-            &Signal::RShift(ref wire, ref count) => write!(f, "{} RSHIFT {}", wire.get(), count),
-            &Signal::Not(ref wire)               => write!(f, "NOT {}", wire.get()),
-            &Signal::FromWire(ref wire)          => write!(f, "{}", wire.get()),
+            &Signal::LShift(ref wire, ref count) => write!(f, "{} LSHIFT {}", wire, count),
+            &Signal::RShift(ref wire, ref count) => write!(f, "{} RSHIFT {}", wire, count),
+            &Signal::Not(ref wire)               => write!(f, "NOT {}", wire),
+            &Signal::FromWire(ref wire)          => write!(f, "{}", wire),
             &Signal::Constant(ref c)             => write!(f, "{}", c)
         }
     }
@@ -232,14 +232,14 @@ impl<'a> fmt::Display for Signal<'a> {
 
 enum Operand<'a> {
     Constant(u16),
-    FromWire(Cell<&'a Wire<'a>>)
+    FromWire(&'a Wire<'a>)
 }
 
 impl<'a> fmt::Display for Operand<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             &Operand::Constant(ref c)    => write!(f, "{}", c),
-            &Operand::FromWire(ref wire) => write!(f, "{}", wire.get())
+            &Operand::FromWire(ref wire) => write!(f, "{}", wire)
         }
     }
 }
