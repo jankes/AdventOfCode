@@ -15,37 +15,37 @@ fn main() {
     let mut wires = HashMap::<[u8; 2], &Wire>::new();
     let input = read_input("C:\\Users\\jankes\\Documents\\AdventOfCode\\2015\\7\\input.txt");
     for line in input.lines() {
-        let (signal, output_wire) = parse_gate(line, &arena, &mut wires);
-        connect_wires(signal, output_wire);
+        let gate = parse_gate(line, &arena, &mut wires);
+        connect_wires(gate);
 
-        println!("{} -> {}", signal, output_wire);
+        println!("{} -> {}", gate.signal, gate.wire);
     }
 }
 
-fn connect_wires<'a>(signal: &'a Signal<'a>, output_wire: &'a Wire<'a>) {
-    output_wire.input.set(Some(signal));
+fn connect_wires<'a>(gate: &'a Gate<'a>) {
+    gate.wire.input.set(Some(gate));
 
-    match signal {
+    match &gate.signal {
         &Signal::And(ref left, ref right) |
         &Signal::Or(ref left, ref right)  => {
             if let &Operand::FromWire(ref left) = left {
-                left.get().outputs.borrow_mut().push(signal);
+                left.get().outputs.borrow_mut().push(gate);
             }
             if let &Operand::FromWire(ref right) = right {
-                right.get().outputs.borrow_mut().push(signal);
+                right.get().outputs.borrow_mut().push(gate);
             }
         },
         &Signal::LShift(ref wire, _) |
         &Signal::RShift(ref wire, _) |
         &Signal::Not(ref wire) |
-        &Signal::FromWire(ref wire) => wire.get().outputs.borrow_mut().push(signal),
+        &Signal::FromWire(ref wire) => wire.get().outputs.borrow_mut().push(gate),
         &Signal::Constant(_) => ()
     };
 }
 
 fn parse_gate<'a>(line: &str,
               arena: &'a ComponentArena<'a>,
-              wires: &mut HashMap<[u8; 2], &'a Wire<'a>>) -> (&'a Signal<'a>, &'a Wire<'a>) {
+              wires: &mut HashMap<[u8; 2], &'a Wire<'a>>) -> &'a Gate<'a> {
     if line.contains("AND") {
         parse_and_gate(line, arena, wires)
     } else if line.contains("OR") {
@@ -63,63 +63,57 @@ fn parse_gate<'a>(line: &str,
 
 fn parse_and_gate<'a>(line: &str,
                       arena: &'a ComponentArena<'a>,
-                      wires: &mut HashMap<[u8; 2], &'a Wire<'a>>) -> (&'a Signal<'a>, &'a Wire<'a>) {
+                      wires: &mut HashMap<[u8; 2], &'a Wire<'a>>) -> &'a Gate<'a> {
     let (left, right, output) = parse_boolean_gate(line, arena, wires);
-    let signal = arena.alloc_signal(Signal::And(left, right));
-    (signal, output)
+    arena.alloc_gate(Signal::And(left, right), output)
 }
 
 fn parse_or_gate<'a>(line: &str,
                      arena: &'a ComponentArena<'a>,
-                     wires: &mut HashMap<[u8; 2], &'a Wire<'a>>) -> (&'a Signal<'a>, &'a Wire<'a>) {
+                     wires: &mut HashMap<[u8; 2], &'a Wire<'a>>) -> &'a Gate<'a> {
     let (left, right, output) = parse_boolean_gate(line, arena, wires);
-    let signal = arena.alloc_signal(Signal::Or(left, right));
-    (signal, output)
+    arena.alloc_gate(Signal::Or(left, right), output)
 }
 
 fn parse_lshift_gate<'a>(line: &str,
                          arena: &'a ComponentArena<'a>,
-                         wires: &mut HashMap<[u8; 2], &'a Wire<'a>>) -> (&'a Signal<'a>, &'a Wire<'a>) {
+                         wires: &mut HashMap<[u8; 2], &'a Wire<'a>>) -> &'a Gate<'a> {
     let (left, right, output) = parse_shift_gate(line, arena, wires);
-    let signal = arena.alloc_signal(Signal::LShift(Cell::new(left), right));
-    (signal, output)
+    arena.alloc_gate(Signal::LShift(Cell::new(left), right), output)
 }
 
 fn parse_rshift_gate<'a>(line: &str,
                          arena: &'a ComponentArena<'a>,
-                         wires: &mut HashMap<[u8; 2], &'a Wire<'a>>) -> (&'a Signal<'a>, &'a Wire<'a>) {
+                         wires: &mut HashMap<[u8; 2], &'a Wire<'a>>) -> &'a Gate<'a> {
     let (left, right, output) = parse_shift_gate(line, arena, wires);
-    let signal = arena.alloc_signal(Signal::RShift(Cell::new(left), right));
-    (signal, output)
+    arena.alloc_gate(Signal::RShift(Cell::new(left), right), output)
 }
 
 fn parse_not_gate<'a>(line: &str,
                       arena: &'a ComponentArena<'a>,
-                      wires: &mut HashMap<[u8; 2], &'a Wire<'a>>) -> (&'a Signal<'a>, &'a Wire<'a>) {
+                      wires: &mut HashMap<[u8; 2], &'a Wire<'a>>) -> &'a Gate<'a> {
     let mut parts = line.split(' ');
     let _not = parts.next().unwrap();
     let input = parts.next().unwrap();
     let _arrow = parts.next().unwrap();
     let output = parts.next().unwrap();
-
-    (arena.alloc_signal(Signal::Not(Cell::new(parse_wire(input, arena, wires)))),
-     parse_wire(output, arena, wires))
+    arena.alloc_gate(Signal::Not(Cell::new(parse_wire(input, arena, wires))),
+                     parse_wire(output, arena, wires))
 }
 
 fn parse_direct_set<'a>(line: &str,
                     arena: &'a ComponentArena<'a>,
-                    wires: &mut HashMap<[u8; 2], &'a Wire<'a>>) -> (&'a Signal<'a>, &'a Wire<'a>) {
+                    wires: &mut HashMap<[u8; 2], &'a Wire<'a>>) ->  &'a Gate<'a> {
     let mut parts = line.split(' ');
     let input = parts.next().unwrap();
     let _arrow = parts.next().unwrap();
     let output = parts.next().unwrap();
 
-    let input_bytes = input.as_bytes();
-    let signal = match input_bytes[0] {
-        b'0'...b'9' => arena.alloc_signal(Signal::Constant(parse_constant(input))),
-        _           => arena.alloc_signal(Signal::FromWire(Cell::new(parse_wire(input, arena, wires))))
-    };
-    (signal, parse_wire(output, arena, wires))
+    let output_wire = parse_wire(output, arena, wires);
+    match input.as_bytes()[0] {
+        b'0'...b'9' => arena.alloc_gate(Signal::Constant(parse_constant(input)), output_wire),
+        _           => arena.alloc_gate(Signal::FromWire(Cell::new(parse_wire(input, arena, wires))), output_wire)
+    }
 }
 
 fn parse_boolean_gate<'a>(line: &str,
@@ -186,20 +180,20 @@ fn parse_constant(s: &str) -> u16 {
 }
 
 struct ComponentArena<'a> {
-    signals: Arena<Signal<'a>>,
+    gates: Arena<Gate<'a>>,
     wires: Arena<Wire<'a>>
 }
 
 impl<'a> ComponentArena<'a> {
     fn new() -> ComponentArena<'a> {
         ComponentArena {
-            signals: Arena::<Signal<'a>>::new(),
+            gates: Arena::<Gate<'a>>::new(),
             wires: Arena::<Wire<'a>>::new()
         }
     }
 
-    fn alloc_signal(&self, signal: Signal<'a>) -> &mut Signal<'a> {
-        self.signals.alloc(signal)
+    fn alloc_gate(&self, signal: Signal<'a>, wire: &'a Wire<'a>) -> &mut Gate<'a> {
+        self.gates.alloc( Gate { signal: signal, wire: wire })
     }
 
     fn alloc_wire(&self, wire: Wire<'a>) -> &mut Wire<'a> {
@@ -207,24 +201,15 @@ impl<'a> ComponentArena<'a> {
     }
 }
 
-enum Operand<'a> {
-    Constant(u16),
-    FromWire(Cell<&'a Wire<'a>>)
-}
-
-impl<'a> fmt::Display for Operand<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            &Operand::Constant(ref c)    => write!(f, "{}", c),
-            &Operand::FromWire(ref wire) => write!(f, "{}", wire.get())
-        }
-    }
+struct Gate<'a> {
+    signal: Signal<'a>,
+    wire: &'a Wire<'a>
 }
 
 enum Signal<'a> {
     And(Operand<'a>, Operand<'a>),
     Or(Operand<'a>, Operand<'a>),
-    LShift(Cell<&'a Wire<'a>>, u16),
+    LShift(Cell<&'a Wire<'a>>, u16),  // TODO: is Cell needed?
     RShift(Cell<&'a Wire<'a>>, u16),
     Not(Cell<&'a Wire<'a>>),
     FromWire(Cell<&'a Wire<'a>>),
@@ -245,11 +230,25 @@ impl<'a> fmt::Display for Signal<'a> {
     }
 }
 
+enum Operand<'a> {
+    Constant(u16),
+    FromWire(Cell<&'a Wire<'a>>)
+}
+
+impl<'a> fmt::Display for Operand<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &Operand::Constant(ref c)    => write!(f, "{}", c),
+            &Operand::FromWire(ref wire) => write!(f, "{}", wire.get())
+        }
+    }
+}
+
 struct Wire<'a> {
     name: [u8; 2],
     value: Cell<Option<u16>>,
-    input: Cell<Option<&'a Signal<'a>>>,
-    outputs: RefCell<Vec<&'a Signal<'a>>>
+    input: Cell<Option<&'a Gate<'a>>>,
+    outputs: RefCell<Vec<&'a Gate<'a>>>
 }
 
 impl<'a> Wire<'a> {
@@ -258,7 +257,7 @@ impl<'a> Wire<'a> {
             name: name,
             value: Cell::new(None),
             input: Cell::new(None),
-            outputs: RefCell::new(Vec::<&'a Signal<'a>>::new())
+            outputs: RefCell::new(Vec::<&'a Gate<'a>>::new())
         }
     }
 }
