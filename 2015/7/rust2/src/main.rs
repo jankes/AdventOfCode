@@ -17,8 +17,68 @@ fn main() {
     for line in input.lines() {
         let gate = parse_gate(line, &arena, &mut wires);
         connect_wires(gate);
+        update_value(gate);
 
-        println!("{} -> {}", gate.signal, gate.wire);
+        //println!("{} -> {}", gate.signal, gate.wire);
+    }
+    print_values(&wires);
+}
+
+fn print_values<'a>(wires: &HashMap<[u8; 2], &'a Wire<'a>>) {
+    let mut entries = wires.iter().collect::<Vec<(&[u8; 2], &&Wire)>>();
+    entries.sort_by_key(|&(key, _)| *key);
+
+    for &(_, wire) in entries.iter() {
+        match wire.value.get() {
+            Some(value) => println!("{} = {}", wire, value),
+            None        => println!("{} = <not set>", wire)
+        };
+    }
+}
+
+fn update_value<'a>(gate: &'a Gate) {
+    if gate.wire.value.get().is_some() {
+        return;
+    }
+    match &gate.signal {
+        &Signal::And(ref left, ref right) => {
+            if let (Some(left), Some(right)) = (left.value(), right.value()) {
+                gate.wire.value.set(Some(left & right));
+            }
+        },
+        &Signal::Or(ref left, ref right) => {
+            if let (Some(left), Some(right)) = (left.value(), right.value()) {
+                gate.wire.value.set(Some(left | right));
+            }
+        },
+        &Signal::LShift(ref left, ref right) => {
+            if let (Some(wire), count) = (left.value.get(), right) {
+                gate.wire.value.set(Some(wire << count));
+            }
+        },
+        &Signal::RShift(ref left, ref right) => {
+            if let (Some(wire), count) = (left.value.get(), right) {
+                gate.wire.value.set(Some(wire >> count));
+            }
+        },
+        &Signal::Not(ref wire) => {
+            if let Some(value) = wire.value.get() {
+                gate.wire.value.set(Some(!value));
+            }
+        },
+        &Signal::FromWire(ref wire) => {
+            if let Some(value) = wire.value.get() {
+                gate.wire.value.set(Some(value));
+            }
+        }
+        &Signal::Constant(value) => {
+            gate.wire.value.set(Some(value));
+        }
+    };
+    if gate.wire.value.get().is_some() {
+        for gate in gate.wire.outputs.borrow().iter() {
+            update_value(gate);
+        }
     }
 }
 
@@ -233,6 +293,15 @@ impl<'a> fmt::Display for Signal<'a> {
 enum Operand<'a> {
     Constant(u16),
     FromWire(&'a Wire<'a>)
+}
+
+impl<'a> Operand<'a> {
+    fn value(&self) -> Option<u16> {
+        match *self {
+            Operand::Constant(value) => Some(value),
+            Operand::FromWire(wire)  => wire.value.get()
+        }
+    }
 }
 
 impl<'a> fmt::Display for Operand<'a> {
