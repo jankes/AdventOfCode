@@ -1,5 +1,47 @@
 use std::slice::Iter;
 
+struct Item {
+    name: &'static str,
+}
+
+const ITEMS: [Item; 3] = [Item {name: "A"}, Item {name: "B"}, Item {name: "C"}];
+
+struct ItemIter {
+    index: usize
+}
+
+impl Iterator for ItemIter {
+    type Item = &'static Item;
+
+    fn next(&mut self) -> Option<&'static Item> {
+        if self.index < ITEMS.len() {
+            let item = &ITEMS[self.index];
+            self.index += 1;
+            Some(item)
+        } else {
+            None
+        }
+    }
+}
+
+fn items_iter() -> ItemIter {
+    ItemIter { index: 0 }
+}
+
+fn main() {
+    for item in items_iter() {
+        // panics or crashes
+        println!("{}", item.name);
+
+        // works okay
+        // let name = item.name;
+        // println!("{}", name);
+    }
+}
+
+/*
+use std::slice::Iter;
+
 #[derive(Copy, Clone)]
 struct Item {
     name: &'static str,
@@ -42,9 +84,7 @@ fn one_ring_iter<'a>() -> Iter<'a, Item> {
 }
 
 fn two_rings_iter<'a>() -> TwoRingsIter {
-    TwoRingsIter {
-        first: 1, second: 2
-    }
+    TwoRingsIter::new()
 }
 
 struct TwoRingsIter {
@@ -52,12 +92,20 @@ struct TwoRingsIter {
     second: usize
 }
 
-impl Iterator for TwoRingsIter {
-    type Item = (Item, Item);
+impl TwoRingsIter {
+    fn new() -> TwoRingsIter {
+        TwoRingsIter {
+            first: 1, second: 2
+        }
+    }
+}
 
-    fn next(&mut self) -> Option<(Item, Item)> {
+impl Iterator for TwoRingsIter {
+    type Item = (&'static Item, &'static Item);
+
+    fn next(&mut self) -> Option<(&'static Item, &'static Item)> {
         if self.first < RINGS.len() - 1 {
-            let item = (RINGS[self.first], RINGS[self.second]);
+            let item = (&RINGS[self.first], &RINGS[self.second]);
             self.second += 1;
             if self.second >= RINGS.len() {
                 self.first += 1;
@@ -73,6 +121,11 @@ impl Iterator for TwoRingsIter {
 fn main() {
     
     for (ring_1, ring_2) in two_rings_iter() {
+        // let a = ring_1.name;
+        // let b = ring_2.name;
+        // println!("{} {}", a, b);
+
         println!("{} {}", ring_1.name, ring_2.name);
     }
 }
+*/
