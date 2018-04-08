@@ -1,14 +1,45 @@
-use std::str;
-
-fn get_letter<'a>(ascii_slice: &'a [u8], index: usize) -> &'a str {
-    str::from_utf8(&ascii_slice[index..index+1]).unwrap()
-}
+use std::{
+    fs::OpenOptions,
+    io::Read,
+    path::Path,
+    str::FromStr
+};
 
 fn main() {
-    let test = b"abcdef";
+    let input = read_input("C:\\Users\\jankes\\Documents\\AdventOfCode\\2015\\24\\pkgs.txt");
+    let weights = input
+                  .lines()
+                  .map(|line| i16::from_str(line).unwrap())
+                  .collect::<Vec<i16>>();
 
-    choose(3, test.len(), |indexes| {
-        println!("{} {} {}", get_letter(test, indexes[0]), get_letter(test, indexes[1]), get_letter(test, indexes[2]));
+    let total = weights.iter().sum::<i16>();
+    println!("total = {}", total); // total = 1548; (total / 3) = 516; (total / 4) = 387
+
+    part_1(&weights);
+}
+
+fn part_1(weights: &[i16]) {
+    let mut best_weights = (0..6).map(|_| -1).collect::<Vec<i16>>();
+    let mut best_qe = i64::max_value();
+
+    choose(6, weights.len(), |indexes| {
+        let mut sum = 0i16;
+        let mut product = 1i64;
+        for i in indexes {
+            let w = weights[*i];
+            sum += w;
+            product *= w as i64;
+        }
+        if sum == 516 && product <= best_qe {
+            best_qe = product;
+            for (loop_index, weight_index) in indexes.iter().enumerate() {
+                best_weights[loop_index] = weights[*weight_index];
+            }
+            for w in best_weights.iter() {
+                print!("{} ", *w)                
+            }
+            println!("qe = {}", best_qe);
+        }
     });
 }
 
@@ -33,27 +64,6 @@ fn choose<F: FnMut(&[usize])>(choose_count: usize, total_item_count: usize, mut 
             indexes[x] = indexes[x - 1] + 1;
         }
     }
-}
-
-////////////////////
-////////////////////
-////////////////////
-
-use std::{
-    fs::OpenOptions,
-    io::Read,
-    path::Path,
-    str::FromStr
-};
-
-fn main() {
-    let input = read_input("C:\\Users\\jankes\\Documents\\AdventOfCode\\2015\\24\\pkgs.txt");
-    let total = input
-                .lines()
-                .map(|line| i16::from_str(line).unwrap())
-                .sum::<i16>();
-
-    println!("total = {}", total);
 }
 
 fn read_input<P: AsRef<Path>>(path: P) -> String {
