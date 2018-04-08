@@ -16,10 +16,10 @@ fn main() {
     println!("total = {}", total); // total = 1548; (total / 3) = 516; (total / 4) = 387
 
     println!("part 1:");
-    find_best_qe(&weights, 6, 516);
+    find_best_qe(&weights, 6, 516); // no choices of 5 weights adds up to 516 
 
     println!("part 2:");
-    find_best_qe(&weights, 5, 387);
+    find_best_qe(&weights, 5, 387); // no choices of 4 weights adds up to 387
 }
 
 fn find_best_qe(weights: &[i16], weight_count: usize, necessary_weight_sum: i16) {
@@ -40,40 +40,6 @@ fn print_choice(weights: &[i16], indexes: &[usize]) {
         print!("{} ", weights[*weight_index]);
     }
 }
-
-/*
-fn part_2(weights: &[i16]) {
-    let mut best_qe = i64::max_value();
-
-    choose(5, weights.len(), |indexes| {
-        let (sum, product) = calculate_statistics(weights, indexes);
-        if sum == 387 && product <= best_qe {
-            best_qe = product;
-            print_choice(weights, indexes);
-            println!("qe = {}", best_qe);
-        }
-    });
-}
-*/
-/*
-fn part_1(weights: &[i16]) {
-    let mut best_qe = i64::max_value();
-
-    choose(6, weights.len(), |indexes| {
-        
-        if sum == 516 && product <= best_qe {
-            best_qe = product;
-            for (loop_index, weight_index) in indexes.iter().enumerate() {
-                best_weights[loop_index] = weights[*weight_index];
-            }
-            for w in best_weights.iter() {
-                print!("{} ", *w)                
-            }
-            println!("qe = {}", best_qe);
-        }
-    });
-}
-*/
 
 fn calculate_statistics(weights: &[i16], indexes: &[usize]) -> (i16, i64) {
     let mut sum = 0i16;
@@ -120,4 +86,3 @@ fn read_input<P: AsRef<Path>>(path: P) -> String {
 	file.read_to_string(&mut input).expect("failed to read input file");
 	input
 }
-
