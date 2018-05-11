@@ -1,4 +1,3 @@
-
 static INPUT: &'static str =
 "367436765224262147416876392821832169781285655941123648172835986213848397566284241467793119283183835972359686446876651\
 5959157341323361671711215775246919184575771292834762472643851621115394689224144952314841942625929178893862188633473449\
@@ -20,32 +19,24 @@ static INPUT: &'static str =
 7324629397292446879752673";
 
 fn main() {
-    part_1();
+    let part_1 = solve_captcha(INPUT, 1);
+    println!("part 1 = {}", part_1);
+
+    let part_2 = solve_captcha(INPUT, INPUT.len() / 2);
+    println!("part 2 = {}", part_2);
 }
 
-fn part_1() {
-    let sum = INPUT.bytes()
-                   .map(ascii_char_to_number)
-                   .zip(INPUT.bytes().map(ascii_char_to_number).skip(1))
-                   .fold(0u16, |total, (a, b)| {
-                       if a == b {
-                           total + a
-                       } else {
-                           total
-                       }
-                    });
-
-    let bytes = INPUT.as_bytes();
-    let first = ascii_char_to_number(*bytes.first().unwrap());
-    let last = ascii_char_to_number(*bytes.last().unwrap());
-
-    let sum = if first == last {
-                    sum + first
-                } else {
-                    sum
-                };
-
-    println!("part 1: {}", sum);
+fn solve_captcha(captcha: &str, offset: usize) -> u16 {
+    captcha.bytes()
+           .map(ascii_char_to_number)
+           .zip(INPUT.bytes().cycle().map(ascii_char_to_number).skip(offset))
+           .fold(0u16, |total, (a, b)| {
+               if a == b {
+                   total + a
+               } else {
+                   total
+               }
+           })
 }
 
 fn ascii_char_to_number(c: u8) -> u16 {
