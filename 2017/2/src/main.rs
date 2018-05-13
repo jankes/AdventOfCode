@@ -19,19 +19,74 @@ static INPUT: &'static str =
 5278	113	4427	569	5167	175	192	3903	155	1051	4121	5140	2328	203	5653	3233";
 
 fn main() {
+
+    /*
+    for (i, line) in INPUT.lines().enumerate() {
+        let numbers = line.split_whitespace()
+                        .map(str_to_number)
+                        .collect::<Vec<u16>>();
+
+        print!("line {}: ", i);
+        for (j, first) in numbers.iter().enumerate() {
+            for second in numbers.iter().skip((j + 1) as usize) {
+                let (first, second) = if first > second { (first, second) } else { (second, first) };
+                if first % second == 0 {
+                    print!("({},{}) ", first, second);
+                }
+            }
+        }
+        println!();
+    }
+    */
+
+    part_1();
+    part_2();
+}
+
+fn part_1() {
     let checksum =
     INPUT.lines()
          .map(|line| {
              line.split_whitespace()
-                 .map(|number_str| u16::from_str(number_str).unwrap())
-                 .fold((u16::max_value(), u16::min_value()), |(min, max), number| {
-                     let min = if number < min { number } else { min };
-                     let max = if number > max { number } else { max };
-                     (min, max)
-                 })
+                 .map(str_to_number)
+                 .fold((u16::max_value(), u16::min_value()), update_min_max)
          })
          .map(|(min, max)| max - min)
          .sum::<u16>();
 
-    println!("checksum = {}", checksum);
+    println!("part 1: checksum = {}", checksum);
+}
+
+fn part_2() {
+    let checksum =
+    INPUT.lines()
+         .map(|line| {
+             line.split_whitespace()
+                 .map(str_to_number)
+                 .collect::<Vec<u16>>()
+         })
+         .map(|numbers| divide_only_evenly_divisible_pair(&numbers))
+         .sum::<u16>();
+    println!("part 2: checksum = {}", checksum);
+}
+
+fn update_min_max(min_max: (u16, u16), current: u16) -> (u16, u16) {
+    let (min, max) = min_max;
+    (u16::min(min, current), u16::max(max, current))
+}
+
+fn divide_only_evenly_divisible_pair(numbers: &[u16]) -> u16 {
+    for (i, first) in numbers.iter().enumerate() {
+        for second in numbers.iter().skip((i + 1) as usize) {
+            let (first, second) = if first > second { (first, second) } else { (second, first) };
+            if first % second == 0 {
+                return first / second;
+            }
+        }
+    }
+    panic!("no evenly divisible pair");
+}
+
+fn str_to_number(s: &str) -> u16 {
+    u16::from_str(s).unwrap()
 }
