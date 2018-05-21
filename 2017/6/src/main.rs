@@ -1,17 +1,22 @@
 fn main() {
-    let mut mem = Memory::new_with_values(&[4u16, 10, 4, 1, 8, 4, 9, 14, 5, 1, 14, 15, 0, 15, 3, 5]);
+    let mut mem = Memory::new_with_values(&[4u16, 10, 4, 1, 8, 4, 9, 14, 5, 1, 14, 15, 0, 15, 3, 5]);    
     let mut seen_configs = Vec::<Memory>::new();
     seen_configs.push(mem);
 
     mem = Memory::redistribute(&mem);    
     let mut count = 1;
-    while !seen_configs.contains(&mem) {
+    for part in 1..=2 {
+        while !seen_configs.contains(&mem) {
+            seen_configs.push(mem);
+            mem = Memory::redistribute(&mem);
+            count += 1;
+        }
+        println!("part {}: {} redistribution cyles", part, count);
+        seen_configs.clear();
         seen_configs.push(mem);
         mem = Memory::redistribute(&mem);
-        count += 1;
+        count = 1;
     }
-
-    println!("part 1: {} redistribution cyles", count);
 }
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
