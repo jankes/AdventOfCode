@@ -23,9 +23,6 @@ fn main() {
         let weight = parse_weight(&mut chars);
         skip_optional_cr(&mut chars);
 
-        // println!("{}", std::str::from_utf8(&name).unwrap());
-        // println!("{}", weight);
-
         match chars.next() {
             None => {
                 nodes.entry(name)
@@ -35,13 +32,6 @@ fn main() {
             Some(&b' ') => {
                 skip_arrow_to_children(&mut chars);
 
-                // let mut children = Vec::<&Node>::new();
-                // parse_children(&mut chars, |child_name| {
-                //     //println!("   {}", std::str::from_utf8(child_name).unwrap()));
-                //     let child_node = nodes.entry(child_name).or_insert(arena.alloc(Node::new(child_name)));
-                //     children.push(child_node);
-                // });
-
                 let children = parse_children(&mut chars, |child_name|
                     nodes.entry(child_name)
                          .or_insert(arena.alloc(Node::new(child_name)))
@@ -50,11 +40,32 @@ fn main() {
                 let node = nodes.entry(name).or_insert(arena.alloc(Node::new(name)));
                 node.weight.set(weight);
                 node.children.replace(children);
+                for child in node.children.borrow().iter() {
+                    child.parent.set(Some(node));
+                }
             },
             _ => panic!("unexpected char at end of line"),
         };
     }
 
+    let mut root = *nodes.values().next().expect("must have at least one node");
+    while let Some(parent) = root.parent.get() {
+        root = parent;
+    }
+    println!("root is {}", std::str::from_utf8(&root.name).unwrap());
+
+    print_tree(root, 0);
+}
+
+fn print_tree<'a>(node: &'a Node<'a>, level: u16) {
+    for _ in 0..level {
+        print!("  ");
+    }
+    println!("{} ({})", std::str::from_utf8(&node.name).unwrap(), node.weight.get());
+    
+    for &child in node.children.borrow().iter() {
+        print_tree(child, level + 1);
+    }
 }
 
 fn parse_children<'c, 'a, I, F>(chars: &mut Peekable<I>, mut alloc_node: F) -> Vec<&'a Node<'a>>
@@ -73,22 +84,6 @@ fn parse_children<'c, 'a, I, F>(chars: &mut Peekable<I>, mut alloc_node: F) -> V
     }
     children
 }
-
-// Alternate implemenation where the caller creates the list and adds to it
-// fn parse_children<'c, 'a, I, F>(chars: &mut Peekable<I>, mut handle_name: F)
-//     where I: Iterator<Item = &'c u8>,
-//           F: FnMut([u8; 8])
-// {
-//     let child_name = parse_name(chars, b',');
-//     handle_name(child_name);
-//     while let Some(&&c) = chars.peek() {
-//         if c == b' ' {
-//             chars.next();
-//         }
-//         let child_name = parse_name(chars, b',');
-//         handle_name(child_name);
-//     }
-// }
 
 fn skip_arrow_to_children<'c, I: Iterator<Item = &'c u8>>(chars: &mut Peekable<I>) {
     if *chars.next().expect("should get -") != b'-' {
@@ -112,7 +107,7 @@ fn parse_name<'c, I: Iterator<Item = &'c u8>>(chars: &mut Peekable<I>, end_char:
     let mut name = [0u8; 8];
     let mut i = 0;
     while let Some(&c) = chars.next() {
-        if c == end_char {
+        if c == end_char || c == b'\r' {
             break;
         }
         name[i] = c;
@@ -166,13 +161,10 @@ fn power_10(p: usize) -> u32 {
     result
 }
 
-// Do this?
-// #[derive(Clone, Copy, Eq, PartialEq)]
-// struct Name([u8; 8]);
-
 struct Node<'a> {
     name: [u8; 8],
     weight: Cell<u32>,
+    parent: Cell<Option<&'a Node<'a>>>,
     children: RefCell<Vec<&'a Node<'a>>>
 }
 
@@ -181,6 +173,7 @@ impl<'a> Node<'a> {
         Node {
             name: name,
             weight: Cell::new(0),
+            parent: Cell::new(None),
             children: RefCell::new(Vec::new())
         }
     }
@@ -189,60 +182,8 @@ impl<'a> Node<'a> {
         Node {
             name: name,
             weight: Cell::new(weight),
+            parent: Cell::new(None),
             children: RefCell::new(Vec::new())
         }
     }
-
-    // fn new_with_weight_and_children(name: [u8; 8], weight: u32, children: Vec<&'a Node<'a>>) -> Node<'a> {
-    //     Node {
-    //         name: name,
-    //         weight: Cell::new(weight),
-    //         children: RefCell::new(children)
-    //     }
-    // }
 }
-
-//use std::str::FromStr;
-/*
-fn test_stuff() {
-    //let full_description = fs::read_to_string("C:\\Users\\jankes\\Documents\\AdventOfCode\\2017\\7\\tower.txt").unwrap();
-
-    // see all the names
-    {
-        let mut names = full_description
-        .lines()
-        .map(|line| {
-            line.split_whitespace().next().unwrap()
-        })
-        .map(|name| name.len())
-        .collect::<Vec<_>>();
-        
-        names.sort();
-
-        for &name_len in names.iter() {
-            println!("{}", name_len);
-        }
-    }
-
-    // see all the weights
-    {
-        let mut weights = full_description
-
-        .lines()
-
-        .map(|line| line.split_whitespace().skip(1).next().unwrap())
-
-        .map(|weight| weight.trim_left_matches('(').trim_right_matches(')'))
-
-        .map(|weight| u32::from_str(weight).unwrap())
-
-        .collect::<Vec<_>>();
-
-        weights.sort();
-
-        for &w in weights.iter() {
-            println!("{}", w);
-        }
-    }
-}
-*/
