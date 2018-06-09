@@ -9,50 +9,8 @@ use std::iter::Peekable;
 use std::path::Path;
 
 fn main() {
-    let mut raw_data = Vec::<u8>::with_capacity(35500);
-
-    File::open("C:\\Users\\jankes\\Documents\\AdventOfCode\\2017\\7\\example.txt").unwrap()
-    .read_to_end(&mut raw_data).expect("should be able to read file to memory");
-
-    let arena = Arena::<Node>::new();
-    let mut nodes = HashMap::<[u8; 8], &Node>::new();
-
-    for line in raw_data.split(|&c| c == b'\n') {
-        let mut chars = line.iter().peekable();
-
-        let name = parse_name(&mut chars, b' ');
-        let weight = parse_weight(&mut chars);
-        skip_optional_cr(&mut chars);
-
-        match chars.next() {
-            None => {
-                nodes.entry(name)
-                     .and_modify(|node| node.weight.set(weight))
-                     .or_insert(arena.alloc(Node::new_with_weight(name, weight)));
-            },
-            Some(&b' ') => {
-                skip_arrow_to_children(&mut chars);
-
-                let children = parse_children(&mut chars, |child_name|
-                    nodes.entry(child_name)
-                         .or_insert(arena.alloc(Node::new(child_name)))
-                );
-
-                let node = nodes.entry(name).or_insert(arena.alloc(Node::new(name)));
-                node.weight.set(weight);
-                node.children.replace(children);
-                for child in node.children.borrow().iter() {
-                    child.parent.set(Some(node));
-                }
-            },
-            _ => panic!("unexpected char at end of line"),
-        };
-    }
-
-    let mut root = *nodes.values().next().expect("must have at least one node");
-    while let Some(parent) = root.parent.get() {
-        root = parent;
-    }
+    let nodes_arena = Arena::<Node>::new();
+    let root = parse_tree(&nodes_arena, "C:\\Users\\jankes\\Documents\\AdventOfCode\\2017\\7\\tower.txt");
     println!("root is {}", std::str::from_utf8(&root.name).unwrap());
 
     print_tree(root, 0);
@@ -70,12 +28,8 @@ fn print_tree<'a>(node: &'a Node<'a>, level: u16) {
 }
 
 fn parse_tree<'a, P: AsRef<Path>>(arena: &'a Arena<Node<'a>>, file: P) -> &'a Node<'a> {
-    let mut raw_data = Vec::<u8>::with_capacity(35500);
-
-    File::open(file).unwrap()
-    .read_to_end(&mut raw_data).expect("should be able to read file to memory");
-
-    let mut nodes = HashMap::<[u8; 8], &Node>::new();
+    let raw_data = read_raw_data(file);
+    let mut nodes = HashMap::<[u8; 8], &'a Node<'a>>::new();
 
     for line in raw_data.split(|&c| c == b'\n') {
         let mut chars = line.iter().peekable();
@@ -93,32 +47,7 @@ fn parse_tree<'a, P: AsRef<Path>>(arena: &'a Arena<Node<'a>>, file: P) -> &'a No
             Some(&b' ') => {
                 skip_arrow_to_children(&mut chars);
 
-                // let mut children = Vec::new();
-                // let child_name = parse_name(&mut chars, b',');
-                // children.push(*nodes.entry(child_name)
-                //                     .or_insert(arena.alloc(Node::new(child_name))));
-                // while let Some(&&c) = chars.peek() {
-                //     if c == b' ' {
-                //         chars.next();
-                //     }
-                //     let child_name = parse_name(&mut chars, b',');
-                //     children.push(*nodes.entry(child_name)
-                //                         .or_insert(arena.alloc(Node::new(child_name))));
-                // }
-
-                // // let children = parse_children(&mut chars, |child_name|
-                // //     nodes.entry(child_name)
-                // //          .or_insert(arena.alloc(Node::new(child_name)))
-                // // );
-
-                // let node = nodes.entry(name).or_insert(arena.alloc(Node::new(name)));
-                // node.weight.set(weight);
-                // node.children.replace(children);
-                // for child in node.children.borrow().iter() {
-                //     child.parent.set(Some(node));
-                // }
-
-                let children = parse_children_2(&mut chars, arena, &mut nodes);
+                let children = parse_children(&mut chars, &arena, &mut nodes);
 
                 let node = nodes.entry(name).or_insert(arena.alloc(Node::new(name)));
                 node.weight.set(weight);
@@ -132,31 +61,25 @@ fn parse_tree<'a, P: AsRef<Path>>(arena: &'a Arena<Node<'a>>, file: P) -> &'a No
         };
     }
 
+    find_root(&arena, &nodes)
+}
+
+fn find_root<'a>(_arena: &'a Arena<Node<'a>>, nodes: &HashMap<[u8; 8], &'a Node<'a>>) -> &'a Node<'a> {
     let mut root = *nodes.values().next().expect("must have at least one node");
     while let Some(parent) = root.parent.get() {
         root = parent;
     }
-
     root
-    // let node_1 = arena.alloc(Node::new(*b"one     "));
-    // let node_2 = arena.alloc(Node::new(*b"two     "));
-    // let node_3 = arena.alloc(Node::new(*b"three   "));
-
-    // node_1.children.borrow_mut().push(node_2);
-    // node_2.children.borrow_mut().push(node_3);
-
-    // node_3.parent.set(Some(node_2));
-    // node_2.parent.set(Some(node_1));
-
-    //node_1
-
-    // Tree {
-    //     nodes: arena,
-    //     root: None
-    // }
 }
 
-fn parse_children_2<'c, 'a, I>(chars: &mut Peekable<I>,
+fn read_raw_data<P: AsRef<Path>>(file: P) -> Vec<u8> {
+    let mut raw_data = Vec::<u8>::with_capacity(35500);
+    File::open(file).unwrap()
+    .read_to_end(&mut raw_data).expect("should be able to read file to memory");
+    raw_data
+}
+
+fn parse_children<'c, 'a, I>(chars: &mut Peekable<I>,
                                arena: &'a Arena<Node<'a>>,
                                nodes: &mut HashMap<[u8; 8], &'a Node<'a>>) -> Vec<&'a Node<'a>>
     where I: Iterator<Item = &'c u8>
@@ -176,23 +99,6 @@ fn parse_children_2<'c, 'a, I>(chars: &mut Peekable<I>,
                             .or_insert(arena.alloc(Node::new(child_name))));
     }
 
-    children
-}
-
-fn parse_children<'c, 'a, I, F>(chars: &mut Peekable<I>, mut alloc_node: F) -> Vec<&'a Node<'a>>
-    where I: Iterator<Item = &'c u8>,
-          F: FnMut([u8; 8]) -> &'a Node<'a>
-{
-    let mut children = Vec::new();
-    let child_name = parse_name(chars, b',');
-    children.push(alloc_node(child_name));
-    while let Some(&&c) = chars.peek() {
-        if c == b' ' {
-            chars.next();
-        }
-        let child_name = parse_name(chars, b',');
-        children.push(alloc_node(child_name));
-    }
     children
 }
 
@@ -270,11 +176,6 @@ fn power_10(p: usize) -> u32 {
         p -= 1;
     }
     result
-}
-
-struct Tree<'a> {
-    nodes: Arena<Node<'a>>,
-    root: Option<&'a Node<'a>>
 }
 
 struct Node<'a> {
