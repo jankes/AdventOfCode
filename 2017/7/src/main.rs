@@ -7,23 +7,68 @@ use std::fs::File;
 use std::io::Read;
 use std::iter::Peekable;
 use std::path::Path;
+use std::str;
 
 fn main() {
     let nodes_arena = Arena::<Node>::new();
     let root = parse_tree(&nodes_arena, "C:\\Users\\jankes\\Documents\\AdventOfCode\\2017\\7\\tower.txt");
-    println!("root is {}", std::str::from_utf8(&root.name).unwrap());
+    println!("root is {}", str::from_utf8(&root.name).unwrap());
 
-    print_tree(root, 0);
+    balance_check(root);
 }
 
 fn print_tree<'a>(node: &'a Node<'a>, level: u16) {
     for _ in 0..level {
         print!("  ");
     }
-    println!("{} ({})", std::str::from_utf8(&node.name).unwrap(), node.weight.get());
+    println!("{} ({})", str::from_utf8(&node.name).unwrap(), node.weight.get());
     
     for &child in node.children.borrow().iter() {
         print_tree(child, level + 1);
+    }
+}
+
+fn balance_check(node: &Node) -> u32 {
+    let children = node.children.borrow();
+    match children.len() {
+        0 => node.weight.get(),
+        1 => node.weight.get() + balance_check(children[0]),
+        2 => node.weight.get() + balance_check(children[0]) + balance_check(children[1]),
+        _ => {
+            let first_child_weight = balance_check(children[0]);
+            let second_child_weight = balance_check(children[1]);
+            let mut all_children_weight = first_child_weight + second_child_weight;
+
+            if first_child_weight == second_child_weight {
+                for child in children.iter().skip(2) {
+                    let weight = balance_check(*child);
+                    all_children_weight += weight;
+
+                    if weight != first_child_weight {
+                        println!("{} has incorrect weight", str::from_utf8(&child.name).unwrap());
+                        println!("expected {} but got {}", first_child_weight, weight);
+                    }
+                }
+            } else {
+                let third_child_weight = balance_check(children[2]);
+                all_children_weight += third_child_weight;
+
+                if third_child_weight == first_child_weight {
+                    println!("{} has incorrect weight", str::from_utf8(&children[1].name).unwrap());
+                    println!("expected {} but got {}", first_child_weight, second_child_weight);
+                } else if third_child_weight == second_child_weight {
+                    println!("{} has incorrect weight", str::from_utf8(&children[0].name).unwrap());
+                    println!("expected {} but got {}", second_child_weight, first_child_weight);
+                }
+
+                for child in children.iter().skip(3) {
+                    let weight = balance_check(*child);
+                    all_children_weight += weight;
+                }
+            }
+
+            node.weight.get() + all_children_weight
+        }
     }
 }
 
