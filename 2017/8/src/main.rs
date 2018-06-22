@@ -8,9 +8,38 @@ use std::str::FromStr;
 
 fn main() {
     let program_data = read_to_vec("C:\\\\Users\\jankes\\Documents\\AdventOfCode\\2017\\8\\program.txt");
-    let (program, _) = parse_program(&program_data);
-    for instruction in program {
+    let (program, register_count) = parse_program(&program_data);
+    for instruction in program.iter() {
         println!("{}", instruction);
+    }
+
+    let mut registers = (0..register_count).map(|_| 0).collect::<Vec<i32>>();
+
+    for instruction in program.iter() {
+        if eval_cmp(&instruction.cmp, &registers) {
+            eval_math(&instruction.math, &mut registers);
+        }
+    }
+
+    let max = registers.iter().max().unwrap();
+    println!("largest value in any register is {}", max);
+}
+
+fn eval_math(math: &MathOp, registers: &mut [i32]) {
+    match math {
+        &MathOp::Inc(register_id, arg) => registers[register_id as usize] += arg as i32,
+        &MathOp::Dec(register_id, arg) => registers[register_id as usize] -= arg as i32
+    };
+}
+
+fn eval_cmp(cmp: &CmpOp, registers: &[i32]) -> bool {
+    match cmp {
+        &CmpOp::Equal(register_id, arg) => registers[register_id as usize] == arg as i32,
+        &CmpOp::NotEqual(register_id, arg) => registers[register_id as usize] != arg as i32,
+        &CmpOp::LessThan(register_id, arg) => registers[register_id as usize] < arg as i32,
+        &CmpOp::GreaterThan(register_id, arg) => registers[register_id as usize] > arg as i32,
+        &CmpOp::LessThanOrEqual(register_id, arg) => registers[register_id as usize] <= arg as i32,
+        &CmpOp::GreaterThanOrEqual(register_id, arg) => registers[register_id as usize] >= arg as i32
     }
 }
 
