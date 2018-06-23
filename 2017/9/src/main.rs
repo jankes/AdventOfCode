@@ -5,14 +5,16 @@ use std::path::Path;
 fn main() {
     let chars = read_to_vec("C:\\Users\\jankes\\Documents\\AdventOfCode\\2017\\9\\char_stream.txt");
 
-    let total_score = process_chars(&chars);
+    let (total_score, garbage_count) = process_chars(&chars);
     println!("total score = {}", total_score);
+    println!("garbage count = {}", garbage_count);
 }
 
-fn process_chars(chars: &[u8]) -> i32 {
+fn process_chars(chars: &[u8]) -> (i32, u32) {
     let mut state = State::Group;
     let mut score = 0i32;
     let mut total_score = 0i32;
+    let mut garbage_count = 0u32;
     for (i, c) in chars.iter().enumerate() {
         match state {
             State::Group => {
@@ -37,7 +39,7 @@ fn process_chars(chars: &[u8]) -> i32 {
                 match c {
                     b'!' => state = State::Skip,
                     b'>' => state = State::Group,
-                    _ => ()
+                    _ => garbage_count += 1
                 };
             },
             State::Skip => {
@@ -45,7 +47,7 @@ fn process_chars(chars: &[u8]) -> i32 {
             }
         };
     }
-    total_score
+    (total_score, garbage_count)
 }
 
 enum State {
@@ -63,43 +65,88 @@ fn read_to_vec<P: AsRef<Path>>(file: P) -> Vec<u8> {
 mod tests {
     use super::process_chars;
 
-    #[test]
-    fn t1() {
-        assert_eq!(1, process_chars(b"{}"));
+    fn calculate_total_score(chars: &[u8]) -> i32 {
+        let (total_score, _) = process_chars(chars);
+        total_score
+    }
+
+    fn calculate_garbage_count(chars: &[u8]) -> u32 {
+        let (_, garbage_count) = process_chars(chars);
+        garbage_count
     }
 
     #[test]
-    fn t2() {
-        assert_eq!(6, process_chars(b"{{{}}}"));
+    fn s1() {
+        assert_eq!(1, calculate_total_score(b"{}"));
     }
 
     #[test]
-    fn t3() {
-        assert_eq!(5, process_chars(b"{{},{}}"));
+    fn s2() {
+        assert_eq!(6, calculate_total_score(b"{{{}}}"));
     }
 
     #[test]
-    fn t4() {
-        assert_eq!(16, process_chars(b"{{{},{},{{}}}}"));
+    fn s3() {
+        assert_eq!(5, calculate_total_score(b"{{},{}}"));
     }
 
     #[test]
-    fn t5() {
-        assert_eq!(1, process_chars(b"{<a>,<a>,<a>,<a>}"));
+    fn s4() {
+        assert_eq!(16, calculate_total_score(b"{{{},{},{{}}}}"));
     }
 
     #[test]
-    fn t6() {
-        assert_eq!(9, process_chars(b"{{<ab>},{<ab>},{<ab>},{<ab>}}"));
+    fn s5() {
+        assert_eq!(1, calculate_total_score(b"{<a>,<a>,<a>,<a>}"));
     }
 
     #[test]
-    fn t7() {
-        assert_eq!(9, process_chars(b"{{<!!>},{<!!>},{<!!>},{<!!>}}"));
+    fn s6() {
+        assert_eq!(9, calculate_total_score(b"{{<ab>},{<ab>},{<ab>},{<ab>}}"));
     }
 
     #[test]
-    fn t8() {
-        assert_eq!(3, process_chars(b"{{<a!>},{<a!>},{<a!>},{<ab>}}"));
+    fn s7() {
+        assert_eq!(9, calculate_total_score(b"{{<!!>},{<!!>},{<!!>},{<!!>}}"));
+    }
+
+    #[test]
+    fn s8() {
+        assert_eq!(3, calculate_total_score(b"{{<a!>},{<a!>},{<a!>},{<ab>}}"));
+    }
+
+    #[test]
+    fn g1() {
+        assert_eq!(0, calculate_garbage_count(b"<>"));
+    }
+
+    #[test]
+    fn g2() {
+        assert_eq!(17, calculate_garbage_count(b"<random characters>"));
+    }
+
+    #[test]
+    fn g3() {
+        assert_eq!(3, calculate_garbage_count(b"<<<<>"));
+    }
+
+    #[test]
+    fn g4() {
+        assert_eq!(2, calculate_garbage_count(b"<{!>}>"));
+    }
+
+    #[test]
+    fn g5() {
+        assert_eq!(0, calculate_garbage_count(b"<!!>"));
+    }
+
+    #[test]
+    fn g6() {
+        assert_eq!(0, calculate_garbage_count(b"<!!!>>"));
+    }
+
+    #[test]
+    fn g7() {
+        assert_eq!(10, calculate_garbage_count(b"<{o\"i!a,<{i<a>"));
     }
 }
