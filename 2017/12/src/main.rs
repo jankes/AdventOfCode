@@ -6,60 +6,12 @@ use std::fs;
 use std::str::FromStr;
 
 fn main() {
-    //let mut programs = Programs::new();
-
-    // programs.add_neighbor(0, 2);
-    // programs.add_neighbor(1, 1);
-    // programs.add_neighbor(2, 0);
-    // programs.add_neighbor(2, 3);
-    // programs.add_neighbor(2, 4);
-    // programs.add_neighbor(3, 2);
-    // programs.add_neighbor(3, 4);
-    // programs.add_neighbor(5, 6);
-    // programs.add_neighbor(6, 4);
-    // programs.add_neighbor(6, 5);
-    
-    // for a in 0..=6 {
-    //     for b in 0..=6 {
-    //         println!("{} and {} --> {}", a, b, if programs.are_neighbors(a, b) { "yes" } else { "no" });
-    //     }
-    // }
-
     let spec = fs::read_to_string("C:\\Users\\jankes\\Documents\\AdventOfCode\\2017\\12\\pipes.txt")
                .expect("should be able to read neighbor specification to a String");
 
-    let programs = parse_programs(&spec);
+    let programs = Programs::parse(&spec);
 
     println!("program 0 group size = {} ", programs.group_size(0));
-
-
-    // for program_id in 0u16..100 {
-    //     print!("{} <-> ", program_id);
-    //     for neighbor_id in programs.neighbors(program_id) {
-    //         print!("{} ", neighbor_id);
-    //     }
-    //     println!();
-    // }
-
-
-}
-
-fn parse_programs(neighbor_spec: &str) -> Programs {
-    let mut programs = Programs::new();
-    for line in neighbor_spec.lines() {
-        let mut spec = line.split(" <-> ");
-
-        let program_id_str = spec.next().expect("expect program id");
-        let program_id = u16::from_str(program_id_str).expect("program id should be able to parse to Rust u16");
-
-        let neighbors_str = spec.next().expect("expect list of neighbors");
-        let mut neighbors = neighbors_str.split(", ");
-        while let Some(neighbor_str) = neighbors.next() {
-            let neighbor_id = u16::from_str(neighbor_str).expect("neighbor id should be able to parse to Rust u16");
-            programs.add_neighbor(program_id, neighbor_id);
-        }
-    }
-    programs
 }
 
 const NUM_PROGRAMS: usize = 2000;
@@ -71,6 +23,24 @@ struct Programs {
 }
 
 impl Programs {
+    fn parse(neighbor_spec: &str) -> Programs {
+        let mut programs = Programs::new();
+        for line in neighbor_spec.lines() {
+            let mut spec = line.split(" <-> ");
+
+            let program_id_str = spec.next().expect("expect program id");
+            let program_id = u16::from_str(program_id_str).expect("program id should be able to parse to Rust u16");
+
+            let neighbors_str = spec.next().expect("expect list of neighbors");
+            let mut neighbors = neighbors_str.split(", ");
+            while let Some(neighbor_str) = neighbors.next() {
+                let neighbor_id = u16::from_str(neighbor_str).expect("neighbor id should be able to parse to Rust u16");
+                programs.add_neighbor(program_id, neighbor_id);
+            }
+        }
+        programs
+    }
+
     fn new() -> Programs {
         Programs {
             neighbors: Box::new([0u16; MAX_NEIGHBOORS * NUM_PROGRAMS]),
