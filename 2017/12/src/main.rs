@@ -1,127 +1,119 @@
-extern crate fixedbitset;
-
-use fixedbitset::FixedBitSet;
-use std::boxed::Box;
+use std::collections::HashSet;
 use std::fs;
 use std::str::FromStr;
 
 fn main() {
     let spec = fs::read_to_string("C:\\Users\\jankes\\Documents\\AdventOfCode\\2017\\12\\pipes.txt")
-               .expect("should be able to read neighbor specification to a String");
+               .expect("should be able to read connection specification to a String");
 
-    let programs = Programs::parse(&spec);
+    let mut programs = parse_connections(&spec);
 
-    println!("program 0 group size = {} ", programs.group_size(0));
+    // part 1
+    let root = programs.find_compress(0);    
+    println!("program 0 group size = {}", programs.get_size(root));
+
+    // part 2
+    let mut roots = HashSet::new();
+    for i in 0..programs.get_count() {
+        let root = programs.find_compress(i);
+        roots.insert(root);
+    }
+    println!("there are {} groups", roots.len());
 }
 
-const NUM_PROGRAMS: usize = 2000;
-const MAX_NEIGHBOORS: usize = 6;
+fn parse_connections(connections: &str) -> Programs {
+    let mut programs = Programs::with_count(count_lines(connections));
+
+    for line in connections.lines() {
+        let mut spec = line.split(" <-> ");
+
+        let program_id_str = spec.next().expect("expect program id");
+        let program_id = u16::from_str(program_id_str).expect("program id should be able to parse to Rust u16");
+
+        let connections_str = spec.next().expect("expect list of connected programs");
+        let mut connected_to = connections_str.split(", ");
+        while let Some(connected_id_str) = connected_to.next() {
+            let connected_id = u16::from_str(connected_id_str).expect("connected program id should be able to parse to Rust u16");
+            programs.union(program_id, connected_id);
+        }
+    }
+    programs
+}
+
+fn count_lines(s: &str) -> u16 {
+    s.lines().map(|_| 1u16).sum::<u16>()
+}
+
+struct Node {
+    parent: u16,
+    size: u16
+}
 
 struct Programs {
-    neighbors: Box<[u16; MAX_NEIGHBOORS * NUM_PROGRAMS as usize]>,
-    counts: Box<[u8; NUM_PROGRAMS as usize]>
+    nodes: Vec<Node>
 }
 
 impl Programs {
-    fn parse(neighbor_spec: &str) -> Programs {
-        let mut programs = Programs::new();
-        for line in neighbor_spec.lines() {
-            let mut spec = line.split(" <-> ");
-
-            let program_id_str = spec.next().expect("expect program id");
-            let program_id = u16::from_str(program_id_str).expect("program id should be able to parse to Rust u16");
-
-            let neighbors_str = spec.next().expect("expect list of neighbors");
-            let mut neighbors = neighbors_str.split(", ");
-            while let Some(neighbor_str) = neighbors.next() {
-                let neighbor_id = u16::from_str(neighbor_str).expect("neighbor id should be able to parse to Rust u16");
-                programs.add_neighbor(program_id, neighbor_id);
-            }
+    fn with_count(count: u16) -> Programs {
+        let mut nodes = Vec::<Node>::with_capacity(count as usize);
+        for i in 0..count {
+            nodes.push(Node {
+                parent: i,
+                size: 1
+            });
         }
-        programs
-    }
-
-    fn new() -> Programs {
         Programs {
-            neighbors: Box::new([0u16; MAX_NEIGHBOORS * NUM_PROGRAMS]),
-            counts: Box::new([0u8; NUM_PROGRAMS as usize])
+            nodes: nodes
         }
     }
 
-    fn group_size(&self, id: u16) -> usize {
-        let mut found = FixedBitSet::with_capacity(NUM_PROGRAMS);
-        self.group_size_helper(id, &mut found);
-        found.count_ones(..)
-    }
-
-    fn group_size_helper(&self, id: u16, found: &mut FixedBitSet) {
-        if !found[id as usize] {
-            found.insert(id as usize);
-            for neighbor_id in self.neighbors(id) {
-                self.group_size_helper(neighbor_id, found);
-            }
+    fn union(&mut self, a: u16, b: u16) {
+        let a_root = self.find_compress(a);
+        let b_root = self.find_compress(b);
+        if a_root != b_root {
+            let (a_root, b_root) = self.order_by_size(a_root, b_root);
+            self.set_parent(b_root, a_root);
+            let new_size = self.get_size(a_root) + self.get_size(b_root);
+            self.set_size(a_root, new_size);
         }
     }
 
-    fn add_neighbor(&mut self, a: u16, b: u16) {
-        if self.are_neighbors(a, b) {
-            return;
-        }
-        let a_count = self.counts[a as usize] as usize;
-        let b_count = self.counts[b as usize] as usize;
-        if a_count == MAX_NEIGHBOORS || b_count as usize == MAX_NEIGHBOORS {
-            panic!("too many neighbors: ({}, {})", a, b);
-        }
-        self.neighbors[a as usize * MAX_NEIGHBOORS + a_count] = b;
-        self.neighbors[b as usize * MAX_NEIGHBOORS + b_count] = a;
-        self.counts[a as usize] += 1;
-        self.counts[b as usize] += 1;
-    }
-
-    fn are_neighbors(&self, a: u16, b: u16) -> bool {
-        if a == b {
-            return true;
-        }
-        for program_id in self.neighbors(a) {
-            if program_id == b {
-                return true;
-            }
-        }
-        false
-    }
-
-    fn neighbors(&self, id: u16) -> ProgramsIter {
-        ProgramsIter::new(self, id)
-    }
-}
-
-struct ProgramsIter<'a> {
-    programs: &'a Programs,
-    index: usize,
-    end: usize
-}
-
-impl<'a> ProgramsIter<'a> {
-    fn new(programs: &'a Programs, program_id: u16) -> ProgramsIter<'a> {
-        let index = program_id as usize * MAX_NEIGHBOORS;
-        ProgramsIter {
-            programs: programs,
-            index: index,
-            end: index + programs.counts[program_id as usize] as usize
-        }
-    }
-}
-
-impl<'a> Iterator for ProgramsIter<'a> {
-    type Item = u16;
-
-    fn next(&mut self) -> Option<u16> {
-        if self.index < self.end {
-            let next = Some(self.programs.neighbors[self.index]);
-            self.index  += 1;
-            next
+    fn find_compress(&mut self, id: u16) -> u16 {
+        let parent = self.get_parent(id);
+        if parent == id {
+            parent
         } else {
-            None
+            let root = self.find_compress(parent);
+            self.set_parent(id, root);
+            root
         }
+    }
+
+    fn order_by_size(&self, a: u16, b: u16) -> (u16, u16) {
+        if self.get_size(a) < self.get_size(b) {
+            (b, a)
+        } else {
+            (a, b)
+        }
+    }
+
+    fn get_parent(&self, id: u16) -> u16 {
+        self.nodes[id as usize].parent
+    }
+
+    fn get_size(&self, id: u16) -> u16 {
+        self.nodes[id as usize].size
+    }
+
+    fn set_parent(&mut self, id: u16, parent: u16) {
+        self.nodes[id as usize].parent = parent;
+    }
+
+    fn set_size(&mut self, id: u16, size: u16) {
+        self.nodes[id as usize].size = size;
+    }
+
+    fn get_count(&self) -> u16 {
+        self.nodes.len() as u16
     }
 }
