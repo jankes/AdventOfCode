@@ -4,4 +4,3 @@ version = "0.1.0"
 authors = ["Scott Janke <sjanke@gmail.com>"]
 
 [dependencies]
-fixedbitset = "0.1.9"
