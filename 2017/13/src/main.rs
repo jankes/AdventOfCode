@@ -1,140 +1,71 @@
-use std::str::FromStr;
-use std::fs;
-
 fn main() {
-    let firewall_spec = fs::read_to_string("C:\\Users\\jankes\\Documents\\AdventOfCode\\2017\\13\\firewall.txt")
-                        .expect("should be able to read firewall specification");
+    // let securities = vec!((0u8, 3u8), (1, 2), (4, 4), (6, 4))
+                    //  .into_iter()
+                    //  .map(|(depth, range)| Security::new(depth, range))
+                    //  .collect::<Vec<Security>>();
 
-    let mut sim = FirewallSim::from_spec(&firewall_spec);
+    let securities = vec!(
+        (0u8, 4u8), (1, 2), (2, 3), (4, 4), (6, 8), (8, 5), (10, 6), (12, 6),
+        (14, 10), (16, 8), (18, 6), (20, 9), (22, 8), (24, 6), (26, 8), (28, 8),
+        (30, 12), (32, 12), (34, 12), (36, 12), (38, 10), (40, 12), (42, 12), (44, 14),
+        (46, 8), (48, 14), (50, 12), (52, 14), (54, 14), (58, 14), (60, 12), (62, 14),
+        (64, 14), (66, 12), (68, 12), (72, 14), (74, 18), (76, 17), (86, 14), (88, 20),
+        (92, 14), (94, 14), (96, 18), (98, 18))
+        .into_iter()
+        .map(|(depth, range)| Security::new(depth, range))
+        .collect::<Vec<Security>>();
 
-    for (layer, maybe_security) in sim.layers.iter().enumerate() {
-        match maybe_security {
-            Some(security) => println!("{}: {}", layer, security.range),
-            None           => println!("{}:", layer)
-        };
+    for security in securities.iter() {
+        println!("{}: {}", security.depth, security.period);
     }
 
-    let trip_severity = sim.simulate();
-    println!("trip severity = {}", trip_severity);
+    // part 1
+    let mut severity = 0u16;
+    for security in securities.iter() {
+        if would_catch_me(security, 0) {
+            severity += security.get_severity();
+        }
+    }
+    println!("trip severity = {}", severity);
+
+    // part 2
+    let mut delay = 0;
+    while delay < 10000000 {
+        let mut got_caught = false;
+        for security in securities.iter() {
+            if would_catch_me(security, delay) {
+                got_caught = true;
+                break;
+            }
+        }
+        if !got_caught {
+            println!("can get through with delay = {}", delay);
+            break;
+        }
+        delay += 2;
+    }
+}
+
+fn would_catch_me(security: &Security, delay: u32) -> bool {
+    let depth = security.depth as u32;
+    let period = security.period as u32;
+    (depth + delay) % period == 0
 }
 
 struct Security {
-    position: u8,
-    is_forwards: bool,
-    range: u8
-}
-
-struct FirewallSim {
-    my_position: u8,
-    layers: Vec<Option<Security>>
+    depth: u8,
+    period: u8
 }
 
 impl Security {
-    fn with_range(range: u8) -> Security {
+    fn new(depth: u8, range: u8) -> Security {
         Security {
-            position: 0,
-            is_forwards: true,
-            range: range
-        }
-    }
-}
-
-impl FirewallSim {
-    fn from_spec(spec: &str) -> FirewallSim {
-        let mut layers = Vec::<Option<Security>>::new();
-        let mut next_layer = 0u8;
-        for line in spec.lines() {
-            let (layer, range) = parse_layer_and_range(line);
-
-            next_layer = fill_empty_layers(&mut layers, layer, next_layer);
-
-            layers.push(Some(Security::with_range(range)));
-        }
-        return FirewallSim { my_position: 0, layers: layers };
-
-        fn fill_empty_layers(layers: &mut Vec<Option<Security>>, current_layer: u8, mut next_layer: u8) -> u8 {
-            if next_layer == 0 && current_layer != 0 {
-                panic!("expect definition for layer 0 to be first line of firewall spec");
-            } else {
-                while current_layer != next_layer {
-                    next_layer += 1;
-                    layers.push(None);
-                }
-            }
-            current_layer + 1
-        }
-
-        fn parse_layer_and_range(line: &str) -> (u8, u8) {
-            let mut parts = line.split(": ");
-            let layer_str = parts.next().expect("expect layer number");
-            let layer = u8::from_str(layer_str).expect("expect layer number to be a number storable within a u8");
-            let range_str = parts.next().expect("expect range");
-            let range = u8::from_str(range_str).expect("expect range to be a number storable within a u8");
-            (layer, range)
+            depth: depth,
+            period: 2 * (range - 1)
         }
     }
 
-    fn simulate(&mut self) -> u16 {
-        // picosecond 0: no severity even if we do get caught
-        // just step the security programs to put us in a state where further {step_me, step_security} steps work as expected
-        self.step_security();
-
-        let mut total_severity = 0u16;
-        while let (severity, false) = self.step() {
-            total_severity += severity;
-        }
-        total_severity
-    } 
-
-    fn step(&mut self) -> (u16, bool) {
-        let (severity, done) = self.step_me();
-        self.step_security();
-        (severity, done)
-    }
-
-    fn step_me(&mut self) -> (u16, bool) {
-        if self.my_position as usize + 1 < self.layers.len() {
-            self.my_position += 1;
-            let severity =
-                if let Some(ref security) = self.layers[self.my_position as usize] {
-                    if security.position == 0 {
-                        println!("caught at layer {}!", self.my_position);
-                        self.my_position as u16 * security.range as u16
-                    } else {
-                        0
-                    }
-                } else {
-                    0
-                };
-            (severity, false)
-        } else {
-            (0, true)
-        }
-    }
-
-    fn step_security(&mut self) {
-        for layer in self.layers.iter_mut() {
-            if let Some(ref mut security) = layer {
-                if security.is_forwards {
-                    if security.position + 1 < security.range {
-                        security.position += 1;
-                    } else {
-                        security.is_forwards = false;
-                        if security.position != 0 {
-                            security.position -= 1;
-                        }
-                    }
-                } else {
-                    if security.position != 0 {
-                        security.position -= 1;
-                    } else {
-                        security.is_forwards = true;
-                        if security.range > 1 {
-                            security.position = 1;
-                        }
-                    }
-                }
-            }
-        }
+    fn get_severity(&self) -> u16 {
+        self.depth as u16 * ((self.period / 2) + 1) as u16
     }
 }
