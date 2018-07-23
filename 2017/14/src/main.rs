@@ -1,28 +1,250 @@
+use std::collections::VecDeque;
+
 fn main() {
-    // let example = [knot_hash(b"flqrgnkx-0")[0],
-    //                knot_hash(b"flqrgnkx-1")[0],
-    //                knot_hash(b"flqrgnkx-2")[0],
-    //                knot_hash(b"flqrgnkx-3")[0],
-    //                knot_hash(b"flqrgnkx-4")[0],
-    //                knot_hash(b"flqrgnkx-5")[0],
-    //                knot_hash(b"flqrgnkx-6")[0],
-    //                knot_hash(b"flqrgnkx-7")[0]];
+    // let example = [knot_hash(b"flqrgnkx-0"),
+    //                knot_hash(b"flqrgnkx-1"),
+    //                knot_hash(b"flqrgnkx-2"),
+    //                knot_hash(b"flqrgnkx-3"),
+    //                knot_hash(b"flqrgnkx-4"),
+    //                knot_hash(b"flqrgnkx-5"),
+    //                knot_hash(b"flqrgnkx-6"),
+    //                knot_hash(b"flqrgnkx-7")];
     // for &t in test.iter() {
     //     println!("{:02x}", t);
     // }
 
-    let squares_used = 
+    let rows =
     (0..128u16)
     .map(|i| get_input_row(i))
     .map(|row| knot_hash(&row))
-    .map(|hash| pop_count(&hash))
-    .sum::<u16>();
+    .collect::<Vec<[u8; 16]>>();
 
+    // testing
+    //let rows = example;
+
+    let squares_used =
+    rows.iter()
+    .map(|row| pop_count(&row))
+    .sum::<u16>();
     println!("{} squares are used", squares_used);
+
+    let mut builder = GridBuilder::new();
+    for row in rows.iter() {
+        builder.add_row(row);
+    }
+    let mut grid = builder.to_grid();
+
+    for row in 0..8 {
+        for col in 0..8 {
+            print!("{} ", grid.get(row, col));
+        }
+        println!();
+    }
+
+    let region_count = grid.count_regions();
+
+    // let mut empty_count = 0u16;
+    // let mut colored_count = 0u16;
+    // for region in 0..region_count {
+    //     for &color in grid.squares.iter() {
+    //         if color != 0 && color - 2 == region {
+    //             colored_count += 1;
+    //         }
+    //     }
+    // }
+    // let empty_count = grid.squares.iter().map(|&color| if color == 0 { 1 } else { 0 }).sum::<u16>();
+    // println!("colored_count = {}, empty_count = {}", colored_count, empty_count);
+
+    println!("there are {} regions", region_count);
+
+    for row in 0..8 {
+        for col in 0..8 {
+            print!("{} ", grid.get(row, col));
+        }
+        println!();
+    }
+}
+
+struct Grid {
+    squares: Box<[u16]>
+}
+
+impl Grid {
+    const BLACK: u16 = 1;
+
+    fn count_regions(&mut self) -> u16 {
+        let mut color = 2u16;
+        let mut queue = VecDeque::<(u8, u8)>::with_capacity(64);
+        for row in 0..128 {
+            for col in 0..128 {
+                if self.get(row, col) == Grid::BLACK {
+                    self.fill(&mut queue, row, col, color);
+                    color += 1;
+                }
+            }
+        }
+        color - 2
+    }
+
+    // fn fill_slow_2(&mut self, queue: &mut VecDeque<(u8, u8)>, row: u8, col: u8, color: u16) {
+    //     queue.clear();
+
+    //     queue.push_back((row, col));
+
+    //     //let mut is_first_loop = true;
+
+    //     while let Some((row, col)) = queue.pop_front() {
+    //         // if !is_first_loop && self.get(row, col) != Grid::BLACK {
+    //         //     println!("already colored");
+    //         //     continue;
+    //         // }
+
+    //         self.set(row, col, color);
+
+    //         if col > 0 && self.get(row, col - 1) == Grid::BLACK {
+    //             queue.push_back((row, col - 1));
+    //         }
+    //         if col < 127 && self.get(row, col + 1) == Grid::BLACK {
+    //             queue.push_back((row, col + 1));
+    //         }
+    //         if row > 0 && self.get(row - 1, col) == Grid::BLACK {
+    //             queue.push_back((row - 1, col));
+    //         }
+    //         if row < 127 && self.get(row + 1, col) == Grid::BLACK {
+    //             queue.push_back((row + 1, col));
+    //         }
+    //         //is_first_loop = false;
+    //     }
+    // }
+
+    // fn fill_slow(&mut self, queue: &mut VecDeque<(u8, u8)>, row: u8, col: u8, color: u16) {
+    //     queue.clear();
+
+    //     self.set(row, col, color);
+    //     queue.push_back((row, col));
+
+    //     //let mut is_first_loop = true;
+
+    //     while let Some((row, col)) = queue.pop_front() {
+    //         // if !is_first_loop && self.get(row, col) != Grid::BLACK {
+    //         //     println!("already colored");
+    //         //     continue;
+    //         // }
+
+    //         if col > 0 && self.get(row, col - 1) == Grid::BLACK {
+    //             self.set(row, col - 1, color);
+    //             queue.push_back((row, col - 1));
+    //         }
+    //         if col < 127 && self.get(row, col + 1) == Grid::BLACK) {
+    //             self.set(row, col + 1, color);
+    //             queue.push_back((row, col + 1));
+    //         }
+    //         if row > 0 && self.get(row - 1, col) == Grid::BLACK {
+    //             self.set(row - 1, col, color);
+    //             queue.push_back((row - 1, col));
+    //         }
+    //         if row < 127 && self.get(row + 1, col) == Grid::BLACK {
+    //             self.set(row + 1, col, color);
+    //             queue.push_back((row + 1, col));
+    //         }
+    //         //is_first_loop = false;
+    //     }
+    // }
+
+    fn fill(&mut self, queue: &mut VecDeque<(u8, u8)>, row: u8, col: u8, color: u16) {
+        // Okay
+        // if self.get(row, col) != Grid::BLACK {
+        //     panic!("should be black");
+        // }
+
+        queue.clear();
+        queue.push_back((row, col));
+
+        while let Some((row, col)) = queue.pop_front() {
+            // blows up
+            // if self.get(row, col) != Grid::BLACK {
+            //     panic!("bad pop");
+            // }
+
+            // no problem
+            // if !(self.get(row, col) == color || self.get(row, col) == Grid::BLACK) {
+            //     panic!("hmmm");
+            // }
+
+            // if self.get(row, col) == color {
+            //     continue;
+            // }
+
+            let mut left = col;
+            let mut right = col;
+            while left > 0 && self.get(row, left - 1) == Grid::BLACK {
+                left -= 1;
+            }
+            while right < 127 && self.get(row, right + 1) == Grid::BLACK {
+                right += 1;
+            }
+            for col in left..=right {
+                self.set(row, col, color);
+                if row > 0 && self.get(row - 1, col) == Grid::BLACK {
+                    queue.push_back((row - 1, col));
+                }
+                if row < 127 && self.get(row + 1, col) == Grid::BLACK {
+                    queue.push_back((row + 1, col));
+                }
+            }
+        }
+    }
+
+    fn get(&self, row: u8, col: u8) -> u16 {
+        self.squares[row as usize * 128usize + col as usize]
+    }
+
+    fn set(&mut self, row: u8, col: u8, color: u16) {
+        self.squares[row as usize * 128usize + col as usize] = color;
+    }
+}
+
+struct GridBuilder {
+    vec: Vec<u16>
+}
+
+impl GridBuilder {
+    fn new() -> GridBuilder {
+        GridBuilder {
+            vec: Vec::<u16>::with_capacity(128 * 128)
+        }
+    }
+
+    fn add_row(&mut self, row: &[u8; 16]) {
+        for &value in row {
+            // self.vec.push(((value & 0b10000000) >> 7) as u16);
+            // self.vec.push(((value & 0b01000000) >> 6) as u16);
+            // self.vec.push(((value & 0b00100000) >> 5) as u16);
+            self.vec.push(get_bit(value, 7));
+            self.vec.push(get_bit(value, 6));
+            self.vec.push(get_bit(value, 5));
+            self.vec.push(get_bit(value, 4));
+            self.vec.push(get_bit(value, 3));
+            self.vec.push(get_bit(value, 2));
+            self.vec.push(get_bit(value, 1));
+            self.vec.push(get_bit(value, 0));
+        }
+
+        fn get_bit(value: u8, index: u8) -> u16 {
+            ((value & (1 << index)) >> index) as u16
+        }
+    }
+
+    fn to_grid(self) -> Grid {
+        Grid {
+            squares: self.vec.into_boxed_slice()
+        }
+    }
 }
 
 fn get_input_row(i: u16) -> Vec<u8> {
-    let input = b"nbysizxe-";
+    //let input = b"nbysizxe-";
+    let input = b"flqrgnkx-"; // example
 
     let mut row = Vec::<u8>::with_capacity(input.len() + 3);
     row.extend_from_slice(input);
