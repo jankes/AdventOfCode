@@ -1,13 +1,49 @@
+// Example
+// const A_INIT: u64 = 65;
+// const B_INIT: u64 = 8921;
+
+// My Input
+const A_INIT: u64 = 618;
+const B_INIT: u64 = 814;
 
 fn main() {
-    // my input
-    let mut a = 618u64;
-    let mut b = 814u64;
+    part_1();
+    part_2();
+}
 
-    // example
-    // let mut a = 65u64;
-    // let mut b = 8921u64;
+fn part_2() {
+    let mut a = A_INIT;
+    let mut b = B_INIT;
+    let mut match_count = 0;
+    for _ in 0..5000000 {
+        a = next_a(a);
+        b = next_b(b);
+        if (a & 0xFFFF) == (b & 0xFFFF) {
+            match_count += 1;
+        }
+    }
+    println!("part 2: match_count = {}", match_count);
 
+    fn next_a(current: u64) -> u64 {
+        next(current, 16807, 0b11)
+    }
+
+    fn next_b(current: u64) -> u64 {
+        next(current, 48271, 0b111)
+    }
+
+    fn next(current: u64, factor: u64, criteria: u64) -> u64 {
+        let mut value = mul(current, factor);
+        while (value & criteria) != 0 {
+            value = mul(value, factor);
+        }
+        value
+    }
+}
+
+fn part_1() {
+    let mut a = A_INIT;
+    let mut b = B_INIT;
     let mut match_count = 0u32;
     for _ in 0..40000000 {
         // a *= 16807;
@@ -22,7 +58,7 @@ fn main() {
             match_count += 1;
         }
     }
-    println!("final count = {}", match_count);
+    println!("part 1: final count = {}", match_count);
 }
 
 // https://en.wikipedia.org/wiki/Modular_arithmetic
