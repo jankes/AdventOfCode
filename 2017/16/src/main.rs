@@ -5,12 +5,21 @@ use std::str::FromStr;
 fn main() {
     let dance = fs::read_to_string("C:\\Users\\jankes\\Documents\\AdventOfCode\\2017\\16\\dance.txt")
                 .expect("should be able to read dance input as String");
-
     let moves = parse_dance(&dance);
 
     let mut programs = Programs::new();
+
     programs.dance(&moves);
-    print!("{}", str::from_utf8(&programs.names).unwrap());
+    println!("part 1: order = {}", programs.get_names());
+
+    // The dancing programs end up in their initial ordering (a, b, c, ...) after 42 rounds of dancing!
+    // So we can skip [higest multiple of 42 less than 1 billion] dances, and just do the remainder
+    // Note they've already done one dance
+    let dances_remaining = (1000000000 % 42) - 1;
+    for _ in 0..dances_remaining {
+        programs.dance(&moves);
+    }
+    println!("part 2: order = {}", programs.get_names());
 }
 
 fn parse_dance(dance: &str) -> Vec<Move> {
@@ -61,6 +70,10 @@ impl Programs {
                     b'i', b'j', b'k', b'l', b'm', b'n', b'o', b'p'],
             scratch: Vec::<u8>::with_capacity(16)
         }
+    }
+
+    fn get_names(&self) -> &str {
+        str::from_utf8(&self.names).unwrap()
     }
 
     fn dance(&mut self, moves: &[Move]) {
