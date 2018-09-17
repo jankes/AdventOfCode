@@ -16,6 +16,10 @@ fn main() {
         })
         .collect::<Vec<Instruction>>();
 
+    part_1(&program);
+}
+
+fn part_1(program: &[Instruction]) {
     let mut program_counter = 0i64;
     let mut registers = Registers::new();
     let mut last_sound = 0i64;
