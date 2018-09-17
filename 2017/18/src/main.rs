@@ -5,6 +5,9 @@ fn main() {
     let program_str = fs::read_to_string("C:\\Users\\jankes\\Documents\\AdventOfCode\\2017\\18\\duet.txt")
         .expect("should be able to read dance");
 
+    println!("size_of(Op) = {}", std::mem::size_of::<Op>());
+    println!("size_of(Instruction) = {}", std::mem::size_of::<Instruction>());
+
     let program = program_str
         .lines()
         .map(|line| {
@@ -13,12 +16,13 @@ fn main() {
         })
         .collect::<Vec<Instruction>>();
 
-    let mut program_counter = 0i32;
+    let mut program_counter = 0i64;
     let mut registers = Registers::new();
-    let mut last_sound = 0i32;
+    let mut last_sound = 0i64;
 
     while 0 <= program_counter && (program_counter as usize) < program.len() {
-        match program[program_counter as usize] {
+        let instruction = program[program_counter as usize];
+        match instruction {
             Instruction::Snd(register)         => last_sound = registers.get(register),
             Instruction::Set(register_dst, op) => {
                 match op {
@@ -29,35 +33,21 @@ fn main() {
                     }
                 }
             },
-            Instruction::Add(register_dst, op) => {
-                let val_original = registers.get(register_dst);
-                match op {
-                    Op::Val(val_to_add)   => registers.set(register_dst, val_original + val_to_add),
-                    Op::Reg(register_src) => {
-                        let val_to_add = registers.get(register_src);
-                        registers.set(register_dst, val_original + val_to_add);
-                    }
-                }
-            },
-            Instruction::Mul(register_dst, op) => {
-                let val_original = registers.get(register_dst);
-                match op {
-                    Op::Val(val_to_mul)   => registers.set(register_dst, val_original * val_to_mul),
-                    Op::Reg(register_src) => {
-                        let val_to_mul = registers.get(register_src);
-                        registers.set(register_dst, val_original * val_to_mul);
-                    }
-                }
-            }
+            Instruction::Add(register_dst, op) |
+            Instruction::Mul(register_dst, op) |
             Instruction::Mod(register_dst, op) => {
                 let val_original = registers.get(register_dst);
-                match op {
-                    Op::Val(val_to_mod)   => registers.set(register_dst, val_original % val_to_mod),
-                    Op::Reg(register_src) => {
-                        let val_to_mod = registers.get(register_src);
-                        registers.set(register_dst, val_original % val_to_mod);
-                    }
-                }
+                let second_operand = match op {
+                    Op::Val(val) => val,
+                    Op::Reg(reg) => registers.get(reg)
+                };
+                let val_updated = match instruction {
+                    Instruction::Add(_, _) => val_original + second_operand,
+                    Instruction::Mul(_, _) => val_original * second_operand,
+                    Instruction::Mod(_, _) => val_original % second_operand,
+                    _                      => unreachable!()
+                };
+                registers.set(register_dst, val_updated)
             },
             Instruction::Rcv(register_test) => {
                 if registers.get(register_test) != 0 {
@@ -84,7 +74,7 @@ fn main() {
 }
 
 struct Registers {
-    regs: [i32; 5]
+    regs: [i64; 5]
 }
 
 impl Registers {
@@ -94,11 +84,11 @@ impl Registers {
         }
     }
     
-    fn set(&mut self, dst: Register, val: i32) {
+    fn set(&mut self, dst: Register, val: i64) {
         self.regs[dst as usize] = val;
     }
 
-    fn get(&self, src: Register) -> i32 {
+    fn get(&self, src: Register) -> i64 {
         self.regs[src as usize]
     }
 }
@@ -143,7 +133,7 @@ fn parse_op<'a>(tokens: &mut impl Iterator<Item = &'a str>) -> Op {
         Some("f") => Op::Reg(Register::F),
         Some("i") => Op::Reg(Register::I),
         Some("p") => Op::Reg(Register::P),
-        Some(val) => Op::Val(i32::from_str(val).expect("unknown register or invalid value")),
+        Some(val) => Op::Val(i64::from_str(val).expect("unknown register or invalid value")),
         _         => panic!("expect operand")
     }
 }
@@ -159,9 +149,10 @@ enum Register {
 
 #[derive(Copy, Clone)]
 enum Op {
-    Reg(Register), Val(i32)
+    Reg(Register), Val(i64)
 }
 
+#[derive(Copy, Clone)]
 enum Instruction {
     Snd(Register),
     Set(Register, Op),
