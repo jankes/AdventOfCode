@@ -1,4 +1,6 @@
+use std::collections::VecDeque;
 use std::fs;
+use std::mem;
 use std::str::FromStr;
 
 fn main() {
@@ -17,63 +19,153 @@ fn main() {
         .collect::<Vec<Instruction>>();
 
     part_1(&program);
+    part_2(&program);
 }
 
-fn part_1(program: &[Instruction]) {
-    let mut program_counter = 0i64;
-    let mut registers = Registers::new();
-    let mut last_sound = 0i64;
+fn part_2(instructions: &[Instruction]) {
+    let mut program_0 = Program::new_with_id(0);
+    let mut program_1 = Program::new_with_id(1);
+    let mut running = &mut program_0;
+    let mut paused = &mut program_1;
+    let mut send_count = 0u32;
 
-    while 0 <= program_counter && (program_counter as usize) < program.len() {
-        let instruction = program[program_counter as usize];
-        match instruction {
-            Instruction::Snd(register)         => last_sound = registers.get(register),
-            Instruction::Set(register_dst, op) => {
-                match op {
-                    Op::Val(val)          => registers.set(register_dst, val),
-                    Op::Reg(register_src) => {
-                        let val = registers.get(register_src);
-                        registers.set(register_dst, val);
-                    }
-                }
-            },
-            Instruction::Add(register_dst, op) |
-            Instruction::Mul(register_dst, op) |
-            Instruction::Mod(register_dst, op) => {
-                let val_original = registers.get(register_dst);
-                let second_operand = match op {
-                    Op::Val(val) => val,
-                    Op::Reg(reg) => registers.get(reg)
-                };
-                let val_updated = match instruction {
-                    Instruction::Add(_, _) => val_original + second_operand,
-                    Instruction::Mul(_, _) => val_original * second_operand,
-                    Instruction::Mod(_, _) => val_original % second_operand,
-                    _                      => unreachable!()
-                };
-                registers.set(register_dst, val_updated)
-            },
-            Instruction::Rcv(register_test) => {
-                if registers.get(register_test) != 0 {
-                    println!("frequency of the last played sound was {}", last_sound);
-                    return;
-                }
-            },
-            Instruction::Jgz(op_test, op_offset) => {
-                let test = match op_test {
-                    Op::Val(test_val)      => test_val,
-                    Op::Reg(test_register) => registers.get(test_register)
-                };
-                if test > 0 {
-                    match op_offset {
-                        Op::Val(offset)          => program_counter += offset,
-                        Op::Reg(register_offset) => program_counter += registers.get(register_offset)
-                    }
-                    continue;
+    while can_continue(running.counter, instructions.len()) ||
+          can_continue(paused.counter, instructions.len()) {
+        while can_continue(running.counter, instructions.len()) {
+            let instruction = &instructions[running.counter as usize];
+            if !handle_basic_instruction(&mut running.registers, &mut running.counter, instruction) {
+                match instruction {
+                    &Instruction::Snd(register) => {
+                        if running.id == 1 {
+                            send_count += 1;
+                        }
+                        paused.msg_queue.push_back(running.registers.get(register));
+                        paused.is_waiting = false;
+                    },
+                    &Instruction::Rcv(register) => {
+                        if let Some(value) = running.msg_queue.pop_front() {
+                            running.registers.set(register, value);
+                        } else {
+                            if paused.is_waiting || !can_continue(paused.counter, instructions.len()) {
+                                println!("deadlock!");
+                                running.counter = -1;
+                                paused.counter = -1;
+                            } else {
+                                running.is_waiting = true;
+                                running.counter -= 1;
+                            }
+                            break;
+                        }
+                    },
+                    _ => panic!("unknown instruction")
                 }
             }
+        }
+        mem::swap(&mut running, &mut paused);
+    }
+    println!("part 2: program 1 sends {} values", send_count);
+}
+
+fn part_1(instructions: &[Instruction]) {
+    let mut registers = Registers::new();
+    let mut program_counter = 0i64;
+    let mut last_sound = 0i64;
+
+    while can_continue(program_counter, instructions.len()) {
+        let instruction = &instructions[program_counter as usize];
+        if !handle_basic_instruction(&mut registers, &mut program_counter, instruction) {
+            match instruction {
+                &Instruction::Snd(register) => {
+                    last_sound = registers.get(register)
+                },
+                &Instruction::Rcv(register_test) => {
+                    if registers.get(register_test) != 0 {
+                        println!("part 1: frequency of the last played sound was {}", last_sound);
+                        return;
+                    }
+                },
+                _ => panic!("unknown instruction")
+            }
+        }
+    }
+}
+
+fn can_continue(program_counter: i64, instructions_len: usize) -> bool {
+    0 <= program_counter && (program_counter as usize) < instructions_len
+}
+
+fn handle_basic_instruction(registers: &mut Registers, program_counter: &mut i64, instruction: &Instruction) -> bool {
+    match instruction {
+        &Instruction::Set(register_dst, op) => {
+            match op {
+                Op::Val(val)          => registers.set(register_dst, val),
+                Op::Reg(register_src) => {
+                    let val = registers.get(register_src);
+                    registers.set(register_dst, val);
+                }
+            }
+            *program_counter += 1;
+            return true;
+        },
+        &Instruction::Add(register_dst, op) |
+        &Instruction::Mul(register_dst, op) |
+        &Instruction::Mod(register_dst, op) => {
+            let val_original = registers.get(register_dst);
+            let second_operand = match op {
+                Op::Val(val) => val,
+                Op::Reg(reg) => registers.get(reg)
+            };
+            let val_updated = match instruction {
+                Instruction::Add(_, _) => val_original + second_operand,
+                Instruction::Mul(_, _) => val_original * second_operand,
+                Instruction::Mod(_, _) => val_original % second_operand,
+                _                      => unreachable!()
+            };
+            registers.set(register_dst, val_updated);
+            *program_counter += 1;
+            return true;
+        },
+        &Instruction::Jgz(op_test, op_offset) => {
+            let test = match op_test {
+                Op::Val(test_val)      => test_val,
+                Op::Reg(test_register) => registers.get(test_register)
+            };
+            if test > 0 {
+                match op_offset {
+                    Op::Val(offset)          => *program_counter += offset,
+                    Op::Reg(register_offset) => *program_counter += registers.get(register_offset)
+                }
+            } else {
+                *program_counter += 1;
+            }
+            return true;
+        },
+        _ => {
+            *program_counter += 1;
+            return false;
+        }
+    };
+}
+
+struct Program {
+    id: i64,
+    counter: i64,
+    registers: Registers,
+    msg_queue: VecDeque<i64>,
+    is_waiting: bool
+}
+
+impl Program {
+    fn new_with_id(id: i64) -> Program {
+        let mut p = Program {
+            id: id,
+            counter: 0i64,
+            registers: Registers::new(),
+            msg_queue: VecDeque::<i64>::with_capacity(32),
+            is_waiting: false
         };
-        program_counter += 1;
+        p.registers.set(Register::P, id);
+        p
     }
 }
 
